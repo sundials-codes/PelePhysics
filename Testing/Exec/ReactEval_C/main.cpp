@@ -18,6 +18,7 @@ using namespace amrex;
 
 #if defined(USE_SUNDIALS_PP)
 // ARKODE or CVODE
+  #include <sundials/sundials_version.h>
   #include <Transport.H>
   #include <reactor.h>
 #else
@@ -64,7 +65,9 @@ main (int   argc,
     /* ODE inputs */
     int ode_ncells = 1;
     int ode_iE     = -1;
-    int third_dim  = 1024;
+    int first_dim  = 2;
+    int second_dim = 1024;
+    int third_dim  = 2;
     int ndt        = 1; 
     Real dt        = 1.e-5;
 #ifdef USE_SUNDIALS_PP
@@ -91,6 +94,12 @@ main (int   argc,
 
         // domain size
         pp.query("max_grid_size",max_grid_size);
+	
+	// first dim
+        pp.query("first_dim",first_dim);
+        
+	// second dim
+        pp.query("second_dim",second_dim);
 
         // third dim
         pp.query("third_dim",third_dim);
@@ -135,6 +144,9 @@ main (int   argc,
     /* PRINT ODE INFO */
     amrex::Print() << "ODE solver: ";
 #ifdef USE_SUNDIALS_PP
+    char sundials_ver[32];
+    SUNDIALSGetVersion(sundials_ver, 32);
+    amrex::Print() << "SUNDIALS version: " << sundials_ver << ", ";
 #ifdef USE_ARKODE_PP 
     amrex::Print() << "Using ARKODE (impl/expl solver)";
 #else
@@ -228,18 +240,17 @@ main (int   argc,
     BL_PROFILE_VAR_STOP(reactInfo);
 
     /* make domain and BoxArray */
-    std::vector<int> npts(3,1);
-    for (int i = 0; i < BL_SPACEDIM; ++i) {
-        npts[i] = 2;
-    }
-    npts[1] = third_dim;
+    std::vector<int> npts = { first_dim, second_dim, third_dim };
+    //for (int i = 0; i < BL_SPACEDIM; ++i) {
+    //    npts[i] = 2;
+    //}
+    //npts[1] = second_dim;;
 
     amrex::Print() << "Integrating "<<npts[0]<< "x"<<npts[1]<< "x"<<npts[2]<< "  box for: ";
     amrex::Print() << dt << " seconds";
     amrex::Print() << std::endl;
 
-    Box domain(IntVect(D_DECL(0,0,0)),
-    IntVect(D_DECL(npts[0]-1,npts[1]-1,npts[2]-1)));
+    Box domain(IntVect(D_DECL(0,0,0)), IntVect(D_DECL(npts[0]-1,npts[1]-1,npts[2]-1)));
 
     BoxArray ba(domain);
     ba.maxSize(max_grid_size);
