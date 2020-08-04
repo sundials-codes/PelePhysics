@@ -348,7 +348,8 @@ main (int   argc,
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
-    for ( MFIter mfi(mf,amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+    // need something line tilingIfNotGPUOnly ?
+    for (MFIter mfi(mf,MFItInfo().SetDynamic(true)); mfi.isValid(); ++mfi) {
 
         const Box& box = mfi.tilebox();
         int ncells     = box.numPts();
@@ -464,7 +465,6 @@ main (int   argc,
                                    &dt_incr, &time);
     #endif
 #else
-
                 fc_tmp_lcl = react(tmp_vect, tmp_src_vect,
                                    tmp_vect_energy, tmp_src_vect_energy,
                                    &dt_incr, &time,
