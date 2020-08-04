@@ -6,9 +6,6 @@
 #include <AMReX_Gpu.H>
 #include <AMREX_misc.H>
 
-/* needed for cudaProfiler<Start|Stop> */
-#include "cuda_profiler_api.h"
-
 using namespace amrex;
 
 #define SUN_CUSP_CONTENT(S)        ( (SUNLinearSolverContent_Dense_custom)(S->content) )
@@ -278,6 +275,9 @@ int react(const amrex::Box& box,
             cusolver_status = cusolverSpCreate(&(user_data->cusolverHandle));
             assert(cusolver_status == CUSOLVER_STATUS_SUCCESS);
 
+            cusolver_status = cusolverSpSetStream(user_data->cusolverHandle, stream);
+            assert(cusolver_status == CUSOLVER_STATUS_SUCCESS);
+            
             cusparse_status = cusparseCreateMatDescr(&(user_data->descrA)); 
             assert(cusparse_status == CUSPARSE_STATUS_SUCCESS);
 
@@ -346,10 +346,16 @@ int react(const amrex::Box& box,
             int retval;
 
             cusolver_status = cusolverSpCreate(&(user_data->cusolverHandle));
+            assert(cusolver_status == CUSPARSE_STATUS_SUCCESS);
+            
+            cusolver_status = cusolverSpSetStream(user_data->cusolverHandle, stream);
             assert(cusolver_status == CUSOLVER_STATUS_SUCCESS);
 
             cusparse_status = cusparseCreate(&(user_data->cuSPHandle));
-            assert(cusolver_status == CUSOLVER_STATUS_SUCCESS);
+            assert(cusolver_status == CUSPARSE_STATUS_SUCCESS);
+            
+            cusparse_status = cusparseSetStream(user_data->cuSPHandle, stream);
+            assert(cusolver_status == CUSPARSE_STATUS_SUCCESS);
 
             A = SUNMatrix_cuSparse_NewBlockCSR(NCELLS, (NUM_SPECIES + 1), (NUM_SPECIES + 1), user_data->NNZ, user_data->cuSPHandle);
             if (check_flag((void *)A, "SUNMatrix_cuSparse_NewBlockCSR", 0)) return(1);
@@ -647,8 +653,6 @@ int react(realtype *rY_in,    realtype *rY_src_in,
     user_data->stream               = stream;
     user_data->nbBlocks             = std::max(1,NCELLS/32);
     user_data->nbThreads            = 32;
-    user_data->iverbose             = 1;
-    pp.query("verbose",user_data->iverbose);
 
     if (user_data->ianalytical_jacobian == 1) { 
         int HP;
@@ -661,7 +665,8 @@ int react(realtype *rY_in,    realtype *rY_src_in,
         /* Find sparsity pattern to fill structure of sparse matrix */
         BL_PROFILE_VAR("SparsityFuegoStuff", SparsityStuff);
         BL_PROFILE_VAR_STOP(SparsityStuff);
-        if (user_data->isolve_type == iterative_gmres_solve) {
+        if (user_data->isolve_type == iterative_gmres_solve && 
+              user_data->ianalytical_jacobian == 1 ) {
             BL_PROFILE_VAR_START(SparsityStuff);
             SPARSITY_INFO_SYST_SIMPLIFIED(&(user_data->NNZ),&HP);
             BL_PROFILE_VAR_STOP(SparsityStuff);
@@ -760,14 +765,11 @@ int react(realtype *rY_in,    realtype *rY_src_in,
             cusolver_status = cusolverSpCreate(&(user_data->cusolverHandle));
             assert(cusolver_status == CUSOLVER_STATUS_SUCCESS);
 
-            cusolver_status = cusolverSpSetStream(user_data->cusolverHandle, stream);
-            assert(cusolver_status == CUSOLVER_STATUS_SUCCESS);
-
             cusparse_status = cusparseCreate(&(user_data->cuSPHandle));
-            assert(cusparse_status == CUSPARSE_STATUS_SUCCESS);
-
-	          cusparse_status = cusparseSetStream(user_data->cuSPHandle, stream);
-            assert(cusparse_status == CUSPARSE_STATUS_SUCCESS);
+            assert(cusolver_status == CUSPARSE_STATUS_SUCCESS);
+            
+            cusparse_status = cusparseSetStream(user_data->cuSPHandle, stream);
+            assert(cusolver_status == CUSPARSE_STATUS_SUCCESS);
 
             A = SUNMatrix_cuSparse_NewBlockCSR(NCELLS, (NUM_SPECIES + 1), (NUM_SPECIES + 1), user_data->NNZ, user_data->cuSPHandle);
             if (check_flag((void *)A, "SUNMatrix_cuSparse_NewBlockCSR", 0)) return(1);
@@ -806,75 +808,6 @@ int react(realtype *rY_in,    realtype *rY_src_in,
 
     }
 
-
-    // Create Sparse batch QR solver
-    // qr info and matrix descriptor
-    BL_PROFILE_VAR("CuSolverInit", CuSolverInit);
-    if (user_data->isolve_type == iterative_gmres_solve) {
-        size_t workspaceInBytes, internalDataInBytes;
-        cusolverStatus_t cusolver_status = CUSOLVER_STATUS_SUCCESS;
-        cusparseStatus_t cusparse_status = CUSPARSE_STATUS_SUCCESS;
-
-        workspaceInBytes = 0;
-        internalDataInBytes = 0;
-
-        cusolver_status = cusolverSpCreate(&(user_data->cusolverHandle));
-        assert(cusolver_status == CUSOLVER_STATUS_SUCCESS);
-        
-	cusolver_status = cusolverSpSetStream(user_data->cusolverHandle, stream);
-        assert(cusolver_status == CUSOLVER_STATUS_SUCCESS);
-
-        cusparse_status = cusparseCreateMatDescr(&(user_data->descrA)); 
-        assert(cusparse_status == CUSPARSE_STATUS_SUCCESS);
-
-        cusparse_status = cusparseSetMatType(user_data->descrA, CUSPARSE_MATRIX_TYPE_GENERAL);
-        assert(cusparse_status == CUSPARSE_STATUS_SUCCESS);
-
-        cusparse_status = cusparseSetMatIndexBase(user_data->descrA, CUSPARSE_INDEX_BASE_ONE);
-        assert(cusparse_status == CUSPARSE_STATUS_SUCCESS);
-
-        cusolver_status = cusolverSpCreateCsrqrInfo(&(user_data->info));
-        assert(cusolver_status == CUSOLVER_STATUS_SUCCESS);
-
-        // symbolic analysis
-        cusolver_status = cusolverSpXcsrqrAnalysisBatched(user_data->cusolverHandle,
-                                   NEQ+1, // size per subsystem
-                                   NEQ+1, // size per subsystem
-                                   user_data->NNZ,
-                                   user_data->descrA,
-                                   user_data->csr_row_count_d,
-                                   user_data->csr_col_index_d,
-                                   user_data->info);
-        assert(cusolver_status == CUSOLVER_STATUS_SUCCESS);
-           
-        /*
-        size_t free_mem = 0;
-        size_t total_mem = 0;
-        cudaStat1 = cudaMemGetInfo( &free_mem, &total_mem );
-        assert( cudaSuccess == cudaStat1 );
-        std::cout<<"(AFTER SA) Free: "<< free_mem<< " Tot: "<<total_mem<<std::endl;
-        */
-
-        // allocate working space 
-        cusolver_status = cusolverSpDcsrqrBufferInfoBatched(user_data->cusolverHandle,
-                                                  NEQ+1, // size per subsystem
-                                                  NEQ+1, // size per subsystem
-                                                  user_data->NNZ,
-                                                  user_data->descrA,
-                                                  user_data->csr_val_d,
-                                                  user_data->csr_row_count_d,
-                                                  user_data->csr_col_index_d,
-                                                  NCELLS,
-                                                  user_data->info,
-                                                  &internalDataInBytes,
-                                                  &workspaceInBytes);
-        assert(cusolver_status == CUSOLVER_STATUS_SUCCESS);
-
-        cudaError_t cudaStat1            = cudaSuccess;
-        cudaStat1 = cudaMalloc((void**)&(user_data->buffer_qr), workspaceInBytes);
-        assert(cudaStat1 == cudaSuccess);
-    }
-    BL_PROFILE_VAR_STOP(CuSolverInit);
 
     /* Definition of main vector */
     y = N_VNewManaged_Cuda(neq_tot);
@@ -970,8 +903,8 @@ int react(realtype *rY_in,    realtype *rY_src_in,
     } else if (user_data->isolve_type == sparse_cusolver_solve) {
         LS = SUNLinSol_cuSolverSp_batchQR(y, A, user_data->cusolverHandle);
         if(check_flag((void *)LS, "SUNLinSol_cuSolverSp_batchQR", 0)) return(1);
-       
-       	/* Set matrix and linear solver to Cvode */
+
+        /* Set matrix and linear solver to Cvode */
         flag = CVodeSetLinearSolver(cvode_mem, LS, A);
         if(check_flag(&flag, "CVodeSetLinearSolver", 1)) return(1);
 
@@ -1001,24 +934,11 @@ int react(realtype *rY_in,    realtype *rY_src_in,
     flag = CVodeSetMaxOrd(cvode_mem, 2);
     if(check_flag(&flag, "CVodeSetMaxOrd", 1)) return(1);
 
-    /* Set the max time step */
-    //flag = CVodeSetMaxStep(cvode_mem, 1e-9);
-    //if(check_flag(&flag, "CVodeSetMaxStep", 1)) return(1); 
- 
-    /* Needed for profiling with multiple threads */
-    static int _call_count = 0;
-    if (_call_count == 0) cudaProfilerStart();
-    #pragma omp critical
-    amrex::Print() << "call count " <<  _call_count++ << "\n";
- 
     BL_PROFILE_VAR("AroundCVODE", AroundCVODE);
     flag = CVode(cvode_mem, time_out, y, &time_init, CV_NORMAL);
     if (check_flag(&flag, "CVode", 1)) return(1);
     BL_PROFILE_VAR_STOP(AroundCVODE);
 
-    /* Needed for profiling with multiple threads */
-    if (_call_count == 2) cudaProfilerStop();
-    
 #ifdef MOD_REACTOR
     /* ONLY FOR PP */
     /*If reactor mode is activated, update time */
@@ -1899,7 +1819,6 @@ static void PrintFinalStats(void *cvodeMem)
   long lenrwLS, leniwLS;
   long int nst, nfe, nsetups, nni, ncfn, netf;
   long int nli, npe, nps, ncfl, nfeLS;
-  double hinused = 0.0;
   int flag;
 
   flag = CVodeGetWorkSpace(cvodeMem, &lenrw, &leniw);
@@ -1933,7 +1852,7 @@ static void PrintFinalStats(void *cvodeMem)
   
   flag = CVodeGetNumLinConvFails(cvodeMem, &ncfl);
   check_flag(&flag, "CVodeGetNumLinConvFails", 1);
-    
+
   Print() <<"\nFinal Statistics: \n";
   Print() <<"lenrw      = " << lenrw   <<"    leniw         = " << leniw   << "\n";
   Print() <<"lenrwLS    = " << lenrwLS <<"    leniwLS       = " << leniwLS << "\n";
