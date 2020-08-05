@@ -163,10 +163,7 @@ main (int   argc,
     BL_PROFILE_VAR("main::reactor_info()", reactInfo);
 
     /* Initialize reactor object */
-#ifdef _OPENMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
-#endif
-{
+
     // Set ODE r/a tolerances
     SetTolFactODE(rtol,atol);
     // Set species-specific abs tolerances
@@ -184,16 +181,17 @@ main (int   argc,
         }
         SetTypValsODE(typ_vals);
     }
+
 #ifdef USE_CUDA_SUNDIALS_PP
     reactor_info(ode_iE, ode_ncells);
 #else
     reactor_init(ode_iE, ode_ncells);
 #endif
-}
 
     BL_PROFILE_VAR_STOP(reactInfo);
 
     /* Make domain and BoxArray */
+
     amrex::Print() << "Integrating "<<npts[0]<< "x"<<npts[1]<< "x"<<npts[2]<< "  box for: ";
     amrex::Print() << dt << " seconds";
     amrex::Print() << std::endl;
