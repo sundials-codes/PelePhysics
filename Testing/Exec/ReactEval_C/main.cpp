@@ -293,7 +293,7 @@ main (int   argc,
     const auto tiling = MFItInfo().SetDynamic(true);
 #pragma omp parallel
 #else
-    const bool tiling = TilingIfNotGPU();
+    const bool tiling = amrex::TilingIfNotGpu();
 #endif
     for (MFIter mfi(mf,tiling); mfi.isValid(); ++mfi) {
         const Box& box  = mfi.tilebox();
