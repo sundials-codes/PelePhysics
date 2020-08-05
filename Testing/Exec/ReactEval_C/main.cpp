@@ -292,11 +292,12 @@ main (int   argc,
 
     /* ADVANCE */
 #ifdef _OPENMP
-#pragma omp parallel if (Gpu::notInLaunchRegion())
+    const auto tiling = MFItInfo().SetDynamic(true);
+#pragma omp parallel
+#else
+    const bool tiling = TilingIfNotGPU();
 #endif
-    // need something line tilingIfNotGPUOnly ?
-    for (MFIter mfi(mf,MFItInfo().SetDynamic(true)); mfi.isValid(); ++mfi) {
-
+    for (MFIter mfi(mf,tiling); mfi.isValid(); ++mfi) {
         const Box& box  = mfi.tilebox();
         int ncells      = box.numPts();
         int extra_cells = 0;

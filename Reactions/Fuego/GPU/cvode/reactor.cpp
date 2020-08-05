@@ -35,9 +35,6 @@ Array<Real,NUM_SPECIES+1> typVals = {-1};
 AMREX_GPU_DEVICE_MANAGED Real relTol    = 1.0e-10;
 AMREX_GPU_DEVICE_MANAGED Real absTol    = 1.0e-10;
 
-/* #ifdef _OPENMP */
-/* #pragma omp threadprivate(sparse_solve,sparse_cusolver_solve,iterative_gmres_solve,eint_rho,enth_rho,typVals,relTol,absTol) */
-/* #endif */
 /**********************************/
 
 /**********************************/
@@ -1857,7 +1854,12 @@ static void PrintFinalStats(void *cvodeMem)
   flag = CVodeGetNumLinConvFails(cvodeMem, &ncfl);
   check_flag(&flag, "CVodeGetNumLinConvFails", 1);
 
-  Print() <<"\nFinal Statistics: \n";
+#ifdef _OPENMP
+  Print() <<"\nFinal Statistics: " << "(thread:" << omp_get_thread_num() << ", ";
+  Print() << "cvodeMem:" << cvodeMem << ")\n";
+#else
+  Print() <<"\nFinal Statistics:\n";
+#endif
   Print() <<"lenrw      = " << lenrw   <<"    leniw         = " << leniw   << "\n";
   Print() <<"lenrwLS    = " << lenrwLS <<"    leniwLS       = " << leniwLS << "\n";
   Print() <<"nSteps     = " << nst     <<"\n";
