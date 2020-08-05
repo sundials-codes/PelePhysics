@@ -34,6 +34,10 @@ AMREX_GPU_DEVICE_MANAGED int enth_rho = 2; // in/out = rhoH/rhoY
 Array<Real,NUM_SPECIES+1> typVals = {-1};
 AMREX_GPU_DEVICE_MANAGED Real relTol    = 1.0e-10;
 AMREX_GPU_DEVICE_MANAGED Real absTol    = 1.0e-10;
+
+/* #ifdef _OPENMP */
+/* #pragma omp threadprivate(sparse_solve,sparse_cusolver_solve,iterative_gmres_solve,eint_rho,enth_rho,typVals,relTol,absTol) */
+/* #endif */
 /**********************************/
 
 /**********************************/

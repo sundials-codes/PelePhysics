@@ -61,15 +61,13 @@ main (int   argc,
     /* ODE inputs */
     int ode_ncells = 1;
     int ode_iE     = -1;
-    int first_dim  = 2;
-    int second_dim = 1024;
-    int third_dim  = 2;
     int ndt        = 1; 
     Real dt        = 1.e-5;
     /* Scaling */
     Real rtol      = 1e-10;
     Real atol      = 1e-10;
     int use_typ_vals = 0;
+    
 
     {
         /* ParmParse from the inputs file */
@@ -78,15 +76,6 @@ main (int   argc,
         // domain size
         pp.query("max_grid_size",max_grid_size);
 	
-	// first dim
-        pp.query("first_dim",first_dim);
-        
-	// second dim
-        pp.query("second_dim",second_dim);
-
-        // third dim
-        pp.query("third_dim",third_dim);
-
         // Get name of fuel
         pp.get("fuel_name", fuel_name);
     }
@@ -119,6 +108,10 @@ main (int   argc,
 
     ParmParse ppa("amr");
     ppa.query("plot_file",pltfile);
+    std::vector<double> npts(3);
+    for (int i = 0; i < 3; ++i) {
+        ppa.get("n_cell", npts[i], i);
+    }
 
     /* PRINT ODE INFO */
     amrex::Print() << "ODE solver: ";
@@ -200,13 +193,7 @@ main (int   argc,
 
     BL_PROFILE_VAR_STOP(reactInfo);
 
-    /* make domain and BoxArray */
-    std::vector<int> npts = { first_dim, second_dim, third_dim };
-    //for (int i = 0; i < BL_SPACEDIM; ++i) {
-    //    npts[i] = 2;
-    //}
-    //npts[1] = second_dim;;
-
+    /* Make domain and BoxArray */
     amrex::Print() << "Integrating "<<npts[0]<< "x"<<npts[1]<< "x"<<npts[2]<< "  box for: ";
     amrex::Print() << dt << " seconds";
     amrex::Print() << std::endl;
@@ -327,7 +314,7 @@ main (int   argc,
 
 #ifdef USE_CUDA_SUNDIALS_PP
         cudaError_t cuda_status = cudaSuccess;
-        ode_ncells    = ncells;
+        ode_ncells = ncells;
 #else
         extra_cells = ncells - ncells / ode_ncells * ode_ncells; 
 #endif
@@ -419,6 +406,7 @@ main (int   argc,
 
 #ifdef USE_CUDA_SUNDIALS_PP
         cuda_status = cudaStreamSynchronize(amrex::Gpu::gpuStream());  
+        assert(cuda_status == cudaSuccess); 
 #endif
 
 
