@@ -87,7 +87,7 @@ cJac(
   N_Vector /* fu */,
   SUNMatrix J,
   void* user_data,
-  N_Vector /* tmp1 */,
+  N_Vector tmp1,
   N_Vector /* tmp2 */,
   N_Vector /* tmp3 */)
 {
@@ -145,8 +145,8 @@ cJac(
     J_col = SM_COLUMN_D(J, offset);
   }
 
-	/* Printing */
 #ifdef PELE_PRINT_OUT_JACOBIAN
+	/* Printing */
 	std::cout << "*** Printing CHEM Jac ***" << std::endl;
 	realtype gamma_curr;
 	CVodeGetCurrentGamma(udata->cvode_mem, &gamma_curr);
@@ -159,12 +159,10 @@ cJac(
 		std::cout << std::endl;
 	}
 	std::cout << "*** END CHEM Jac ***" << std::endl;
-	/*
 	CVodeGetErrWeights(udata->cvode_mem, tmp1);
 	for (int k = 0; k < N_VGetLength(tmp1); k++) {
 	  std::cout << N_VGetArrayPointer(tmp1)[k] << " ";
 	}
-	*/
 	std::cout << std::endl;
 #endif
 
