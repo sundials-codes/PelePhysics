@@ -145,6 +145,29 @@ cJac(
     J_col = SM_COLUMN_D(J, offset);
   }
 
+	/* Printing */
+#ifdef PELE_PRINT_OUT_JACOBIAN
+	std::cout << "*** Printing CHEM Jac ***" << std::endl;
+	realtype gamma_curr;
+	CVodeGetCurrentGamma(udata->cvode_mem, &gamma_curr);
+	realtype *Jdata = SUNDenseMatrix_Data(J);
+	std::cout << "    gamma is:" << gamma_curr <<std::endl;
+	for (int k = 0; k < NUM_SPECIES+1; k++){
+		for (int i = 0; i < NUM_SPECIES+1; i++){
+			std::cout << Jdata[i*(NUM_SPECIES+1) + k] << " ";
+		}
+		std::cout << std::endl;
+	}
+	std::cout << "*** END CHEM Jac ***" << std::endl;
+	/*
+	CVodeGetErrWeights(udata->cvode_mem, tmp1);
+	for (int k = 0; k < N_VGetLength(tmp1); k++) {
+	  std::cout << N_VGetArrayPointer(tmp1)[k] << " ";
+	}
+	*/
+	std::cout << std::endl;
+#endif
+
   return (0);
 }
 

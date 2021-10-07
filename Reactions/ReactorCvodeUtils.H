@@ -25,6 +25,7 @@ namespace reactions {
 
 struct CVODEUserData
 {
+  void* cvode_mem;          // CVODE memory block
   amrex::Real dt_save;      // Internal cvode dt holder
   int ncells_d;             // Number of cells in solve
   int iverbose;             // Verbose

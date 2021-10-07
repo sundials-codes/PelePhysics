@@ -41,6 +41,7 @@ ReactorCvode::init(int reactor_type, int Ncells)
   if (utils::check_flag((void*)udata_g, "allocUserData", 2)) {
     return (1);
   }
+  udata_g->cvode_mem = cvode_mem;
 
   // Set the pointer to user-defined data
   int flag = CVodeSetUserData(cvode_mem, udata_g);
@@ -1547,6 +1548,7 @@ ReactorCvode::react(
   cvode_mem = CVodeCreate(CV_BDF);
   if (utils::check_flag((void*)cvode_mem, "CVodeCreate", 0))
     return (1);
+  user_data->cvode_mem = cvode_mem;
   int flag = CVodeSetUserData(cvode_mem, static_cast<void*>(user_data));
 
   // Call CVodeInit to initialize the integrator memory and specify the

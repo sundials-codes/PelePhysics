@@ -151,7 +151,7 @@ private:
   amrex::Real absTol{1e-10};
   amrex::Array<double, NUM_SPECIES + 1> typVals;
   utils::FlattenOps<Ordering> flatten_ops;
-  int m_reactor_type{0};
+  int m_reactor_type{0}; 
 
 #ifndef AMREX_USE_GPU
   N_Vector y = NULL;

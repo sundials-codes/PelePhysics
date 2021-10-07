@@ -20,7 +20,7 @@ TINY_PROFILE = FALSE
 PELE_PHYSICS_HOME    ?= ../../..
 
 # this flag activates the subcycling mode in the D/Cvode routines
-DEFINES  += -DMOD_REACTOR
+DEFINES  += -DMOD_REACTOR -DPELE_PRINT_OUT_JACOBIAN
 
 ifeq ($(USE_CUDA), TRUE)
   PELE_USE_KLU = FALSE
