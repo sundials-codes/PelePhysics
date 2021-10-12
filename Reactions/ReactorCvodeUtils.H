@@ -44,6 +44,9 @@ struct CVODEUserData
   amrex::Real gamma; // System Chem. jacobian coefficient
   int nbBlocks;      // GPU kernel launch parameter
   int nbThreads;     // GPU kernel launch parameter
+#ifdef PELE_PRINT_OUT_JACOBIAN
+  amrex::PrintToFile* jacPrintFile; // File to dump the analytical jacobian to
+#endif
 
 #ifdef AMREX_USE_GPU
   // Matrix data

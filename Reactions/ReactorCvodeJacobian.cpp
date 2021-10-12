@@ -1,9 +1,11 @@
+#include <random>
 #include "ReactorCvodeJacobian.H"
 
 namespace pele {
 namespace physics {
 namespace reactions {
 namespace cvode {
+
 #ifdef AMREX_USE_GPU
 int
 cJac(
@@ -82,7 +84,7 @@ cJac(
 
 int
 cJac(
-  amrex::Real /* tn */,
+  amrex::Real tn,
   N_Vector u,
   N_Vector /* fu */,
   SUNMatrix J,
@@ -100,6 +102,16 @@ cJac(
   auto* udata = static_cast<CVODEUserData*>(user_data);
   auto ncells = udata->ncells_d;
   auto reactor_type = udata->ireactor_type;
+
+#ifdef PELE_PRINT_OUT_JACOBIAN
+  amrex::PrintToFile& jacPrint = *udata->jacPrintFile;
+  static std::mt19937 rng(time(NULL));
+  static std::uniform_int_distribution<int> gen(1, 10);
+  int rand_num = gen(rng);
+  if (rand_num <= 3) {
+    jacPrint << "(((( BEGIN BATCH, tn = " << tn << " ))))\n";
+  }
+#endif
 
   for (int tid = 0; tid < ncells; tid++) {
     // Offset in case several cells
@@ -143,33 +155,40 @@ cJac(
       J_col[offset + i] = Jmat_tmp[NUM_SPECIES * (NUM_SPECIES + 1) + i] * mw[i];
     }
     J_col = SM_COLUMN_D(J, offset);
+
+#ifdef PELE_PRINT_OUT_JACOBIAN
+    if (rand_num <= 3) {
+      jacPrint << "*** BEGIN Batch Matrix (" << tid << "/" << ncells << ")\n";
+      realtype gamma_curr;
+      CVodeGetCurrentGamma(udata->cvode_mem, &gamma_curr);
+      realtype *Jdata = SUNDenseMatrix_Data(J);
+      jacPrint << "    gamma is:" << gamma_curr << "\n";
+      for (int k = 0; k < NUM_SPECIES+1; k++){
+        for (int i = 0; i < NUM_SPECIES+1; i++){
+          jacPrint << Jdata[i*(NUM_SPECIES+1) + k] << " ";
+        }
+        jacPrint << "\n";
+      }
+      jacPrint << "*** END Batch Matrix (" << tid << "/" << ncells << ")\n";
+    }
+#endif
   }
 
 #ifdef PELE_PRINT_OUT_JACOBIAN
-	/* Printing */
-	std::cout << "*** Printing CHEM Jac ***" << std::endl;
-	realtype gamma_curr;
-	CVodeGetCurrentGamma(udata->cvode_mem, &gamma_curr);
-	realtype *Jdata = SUNDenseMatrix_Data(J);
-	std::cout << "    gamma is:" << gamma_curr <<std::endl;
-	for (int k = 0; k < NUM_SPECIES+1; k++){
-		for (int i = 0; i < NUM_SPECIES+1; i++){
-			std::cout << Jdata[i*(NUM_SPECIES+1) + k] << " ";
-		}
-		std::cout << std::endl;
-	}
-	std::cout << "*** END CHEM Jac ***" << std::endl;
-	CVodeGetErrWeights(udata->cvode_mem, tmp1);
-	for (int k = 0; k < N_VGetLength(tmp1); k++) {
-	  std::cout << N_VGetArrayPointer(tmp1)[k] << " ";
-	}
-	std::cout << std::endl;
+  if (rand_num <= 3) {
+    jacPrint << "(((( END BATCH ))))\n";
+    CVodeGetErrWeights(udata->cvode_mem, tmp1);
+    for (int k = 0; k < N_VGetLength(tmp1); k++) {
+      jacPrint << N_VGetArrayPointer(tmp1)[k] << " ";
+    }
+    jacPrint << "\n";
+  }
 #endif
 
   return (0);
 }
 
-// Analytical SPARSE CSR Jacobian evaluation
+// Analytical SPARSE CSR Jacobian evalu
 int
 cJac_sps(
   amrex::Real /* tn */,

@@ -744,6 +744,8 @@ main(int argc, char* argv[])
 
     trans_parms.deallocate();
 
+    reactor->close();
+
     BL_PROFILE_VAR_STOP(pmain);
 
     amrex::Real run_time = amrex::ParallelDescriptor::second() - strt_time;

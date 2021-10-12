@@ -37,11 +37,10 @@ ReactorCvode::init(int reactor_type, int Ncells)
 
   udata_g =
     (CVODEUserData*)amrex::The_Arena()->alloc(sizeof(struct CVODEUserData));
-  allocUserData(udata_g, Ncells);
+  allocUserData(udata_g, Ncells, cvode_mem);
   if (utils::check_flag((void*)udata_g, "allocUserData", 2)) {
     return (1);
   }
-  udata_g->cvode_mem = cvode_mem;
 
   // Set the pointer to user-defined data
   int flag = CVodeSetUserData(cvode_mem, udata_g);
@@ -265,7 +264,6 @@ ReactorCvode::init(int reactor_type, int Ncells)
 void
 ReactorCvode::checkCvodeOptions() const
 {
-
   // Query options
   amrex::ParmParse pp("ode");
   int iverbose = 0;
@@ -358,6 +356,14 @@ ReactorCvode::checkCvodeOptions() const
       amrex::Print()
         << " Using a dense direct linear solve with Analytical Jacobian\n";
     }
+#ifdef PELE_PRINT_OUT_JACOBIAN
+    std::string jac_file_str = "jacobian.txt";
+    ppcv.query("jacOutFile", jac_file_str);
+    if (iverbose > 0) {
+      amrex::Print()
+        << " Will print Jacobian to " << jac_file_str << "\n";
+    }
+#endif
   } else if (solve_type_str == "sparse_direct") {
     isolve_type = cvode::sparseDirect;
     ianalytical_jacobian = 1;
@@ -639,7 +645,8 @@ ReactorCvode::checkCvodeOptions() const
 void
 ReactorCvode::allocUserData(
   CVODEUserData* udata,
-  int a_ncells
+  int a_ncells,
+  void* cvode_mem
 #ifdef AMREX_USE_GPU
   ,
   SUNMatrix& a_A,
@@ -698,6 +705,11 @@ ReactorCvode::allocUserData(
   } else if (solve_type_str == "denseAJ_direct") {
     udata->isolve_type = cvode::denseDirect;
     udata->ianalytical_jacobian = 1;
+#ifdef PELE_PRINT_OUT_JACOBIAN
+    std::string jac_file_str = "jacobian.txt";
+    ppcv.query("jacOutFile", jac_file_str);
+    udata->jacPrintFile = new amrex::PrintToFile(jac_file_str);
+#endif
   } else if (solve_type_str == "sparse_direct") {
     udata->isolve_type = cvode::sparseDirect;
     udata->ianalytical_jacobian = 1;
@@ -1181,11 +1193,23 @@ ReactorCvode::react(
   void* cvode_mem = NULL;
   CVODEUserData* user_data;
 
+  //----------------------------------------------------------
+  // Allocate the Cvode object
+  cvode_mem = CVodeCreate(CV_BDF);
+  if (utils::check_flag((void*)cvode_mem, "CVodeCreate", 0))
+    return (1);
+
   // Fill user_data
   amrex::Gpu::streamSynchronize();
   user_data =
     (CVODEUserData*)amrex::The_Arena()->alloc(sizeof(struct CVODEUserData));
-  allocUserData(user_data, ncells, A, stream);
+  allocUserData(user_data, ncells, cvode_mem, A, stream);
+
+  //----------------------------------------------------------
+  // Attach user data to Cvode
+  int flag = CVodeSetUserData(cvode_mem, static_cast<void*>(user_data));
+  if (utils::check_flag(&flag, "CVodeSetUserData", 1))
+    return (1);
 
   //----------------------------------------------------------
   // Solution vector and execution policy
@@ -1225,13 +1249,6 @@ ReactorCvode::react(
 #ifdef AMREX_USE_OMP
   Gpu::Device::streamSynchronize();
 #endif
-
-  //----------------------------------------------------------
-  // Setup Cvode object
-  cvode_mem = CVodeCreate(CV_BDF);
-  if (utils::check_flag((void*)cvode_mem, "CVodeCreate", 0))
-    return (1);
-  int flag = CVodeSetUserData(cvode_mem, static_cast<void*>(user_data));
 
   // Call CVodeInit to initialize the integrator memory and specify the
   //  user's right hand side function, the inital time, and
@@ -1335,6 +1352,9 @@ ReactorCvode::react(
   flag = CVodeSetMaxOrd(cvode_mem, user_data->maxOrder);
   if (utils::check_flag(&flag, "CVodeSetMaxOrd", 1))
     return (1);
+  // flag = CVodeSetJacEvalFrequency(cvode_mem, 100); // Max Jac age
+  // if (utils::check_flag(&flag, "CVodeSetJacEvalFrequency", 1))
+    // return (1);
 
   // ----------------------------------------------------------
   // Actual CVODE solve
@@ -1492,11 +1512,23 @@ ReactorCvode::react(
   void* cvode_mem = NULL;
   CVODEUserData* user_data;
 
+  // -------------------------------------------------------------
+  // Allocate the integrator
+  cvode_mem = CVodeCreate(CV_BDF);
+  if (utils::check_flag((void*)cvode_mem, "CVodeCreate", 0))
+    return (1);
+
   // Fill user_data
   amrex::Gpu::streamSynchronize();
   user_data =
     (CVODEUserData*)amrex::The_Arena()->alloc(sizeof(struct CVODEUserData));
-  allocUserData(user_data, Ncells, A, stream);
+  allocUserData(user_data, Ncells, cvode_mem, A, stream);
+
+  // -------------------------------------------------------------
+  // Attach the user data to Cvode
+  int flag = CVodeSetUserData(cvode_mem, static_cast<void*>(user_data));
+  if (utils::check_flag(&flag, "CVodeSetUserData", 1))
+    return (1);
 
   //----------------------------------------------------------
   // Solution vector and execution policy
@@ -1542,14 +1574,6 @@ ReactorCvode::react(
 #ifdef AMREX_USE_OMP
   Gpu::Device::streamSynchronize();
 #endif
-
-  // -------------------------------------------------------------
-  // Initialize integrator
-  cvode_mem = CVodeCreate(CV_BDF);
-  if (utils::check_flag((void*)cvode_mem, "CVodeCreate", 0))
-    return (1);
-  user_data->cvode_mem = cvode_mem;
-  int flag = CVodeSetUserData(cvode_mem, static_cast<void*>(user_data));
 
   // Call CVodeInit to initialize the integrator memory and specify the
   //  user's right hand side function, the inital time, and
@@ -1834,7 +1858,6 @@ ReactorCvode::freeUserData(CVODEUserData* data_wk)
   amrex::The_Device_Arena()->free(data_wk->mask);
 
 #ifdef AMREX_USE_GPU
-
   if (data_wk->isolve_type == cvode::sparseDirect) {
 #ifdef AMREX_USE_CUDA
     amrex::The_Arena()->free(data_wk->csr_row_count_h);
@@ -1874,7 +1897,11 @@ ReactorCvode::freeUserData(CVODEUserData* data_wk)
   amrex::The_Device_Arena()->free(data_wk->FCunt);
 
   // Direct solver Jac. data
-  if (data_wk->isolve_type == cvode::sparseDirect) {
+  if (data_wk->isolve_type == cvode::denseDirect) {
+#ifdef PELE_PRINT_OUT_JACOBIAN
+    delete data_wk->jacPrintFile;
+#endif
+  } else if (data_wk->isolve_type == cvode::sparseDirect) {
 #ifdef PELE_USE_KLU
     delete[] data_wk->colPtrs;
     delete[] data_wk->rowVals;

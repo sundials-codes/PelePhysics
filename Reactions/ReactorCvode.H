@@ -137,7 +137,8 @@ private:
   void checkCvodeOptions() const;
   void allocUserData(
     CVODEUserData* udata,
-    int a_ncells
+    int a_ncells,
+    void* cvode_mem
 #ifdef AMREX_USE_GPU
     ,
     SUNMatrix& a_A,
@@ -151,7 +152,7 @@ private:
   amrex::Real absTol{1e-10};
   amrex::Array<double, NUM_SPECIES + 1> typVals;
   utils::FlattenOps<Ordering> flatten_ops;
-  int m_reactor_type{0}; 
+  int m_reactor_type{0};
 
 #ifndef AMREX_USE_GPU
   N_Vector y = NULL;
