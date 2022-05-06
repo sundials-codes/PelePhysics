@@ -110,6 +110,14 @@ cJac(
       "Calling cJac with solve_type = ginkgo<TYPE> requires PELE_USE_GINKGO = "
       "TRUE !");
 #endif
+  } else if (solveType == ginkgoGMRES || solveType == ginkgoBICGSTAB) {
+ #ifdef PELE_USE_GINKGO
+    // FILL matrix
+#else
+    amrex::Abort(
+      "Calling cJac with solve_type = ginkgo<TYPE> requires PELE_USE_GINKGO = "
+      "TRUE !");
+#endif
   }
 
   return (0);
