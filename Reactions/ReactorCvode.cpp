@@ -112,6 +112,50 @@ const std::unordered_map<std::string, SolverDescriptor> available_solver_types
 };
 } // namespace
 
+namespace {
+
+using utils::SolverDescriptor;
+
+std::unordered_map<std::string, SolverDescriptor> available_solver_types {
+  // available for CPUs or GPUs
+  { "fixed_point",      SolverDescriptor{ cvode::fixedPoint,     /*analytical_jacobian=*/ 0, /*precond_types=*/ {} } },
+  { "gmres",            SolverDescriptor{ cvode::GMRES,          /*analytical_jacobian=*/ 0, /*precond_types=*/ {} } },
+#ifdef AMREX_USE_GPU
+  // available with GPUs only
+#ifdef   PELE_USE_KLU
+  { "magma_direct",     SolverDescriptor{ cvode::magmaDirect,    /*analytical_jacobian=*/ 1, /*precond_types=*/ {} } },
+#endif
+#ifdef   PELE_USE_GINKGO
+  { "ginkgo_GMRES",     SolverDescriptor{ cvode::ginkgoGMRES,    /*analytical_jacobian=*/ 1, /*precond_types=*/ {} } },
+  { "ginkgo_BICGSTAB",  SolverDescriptor{ cvode::ginkgoBICGSTAB, /*analytical_jacobian=*/ 1, /*precond_types=*/ {} } },
+#endif
+  { "sparse_direct",    SolverDescriptor{ cvode::sparseDirect,   /*analytical_jacobian=*/ 1, /*precond_types=*/ {} } },
+  { "precGMRES",        SolverDescriptor{ cvode::precGMRES,      /*analytical_jacobian=*/ 0, /*precond_types=*/ { "cuSparse_simplified_AJacobian" } } },
+#else
+  // available with CPUs only
+  { "dense_direct",     SolverDescriptor{ cvode::denseFDDirect,  /*analytical_jacobian=*/ 0, /*precond_types=*/ {} } },
+  { "denseAJ_direct",   SolverDescriptor{ cvode::denseDirect,    /*analytical_jacobian=*/ 1, /*precond_types=*/ {} } },
+#ifdef   PELE_USE_KLU
+  { "sparse_direct",    SolverDescriptor{ cvode::sparseDirect,   /*analytical_jacobian=*/ 1, /*precond_types=*/ {} } },
+#endif
+  { "custom_direct",    SolverDescriptor{ cvode::customDirect,   /*analytical_jacobian=*/ 1, /*precond_types=*/ {} } },
+  { "precGMRES",        SolverDescriptor{ cvode::precGMRES,      /*analytical_jacobian=*/ 0, /*precond_types=*/ { "custom_simplified_AJacobian", "dense_simplified_AJacobian", "sparse_simplified_AJacobian" } } }
+#endif
+};
+
+std::unordered_map<std::string, int> available_precond_types {
+#ifdef AMREX_USE_GPU
+  { "cuSparse_simplified_AJacobian", cvode::sparseSimpleAJac },
+#else
+  { "dense_simplified_AJacobian",    cvode::denseSimpleAJac },
+  { "custom_simplified_AJacobian",   cvode::customSimpleAJac },
+#ifdef PELE_USE_KLU
+  { "sparse_simplified_AJacobian",   cvode::sparseSimpleAJac }
+#endif
+#endif
+};
+}
+
 int
 ReactorCvode::init(int reactor_type, int ncells)
 {
