@@ -1025,6 +1025,10 @@ ReactorCvode::allocUserData(
     SPARSITY_PREPROC_SYST_CSR(
       udata->csr_col_index_h, udata->csr_row_count_h, &HP, 1, 0);
 
+    auto gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
+      gko::HipExecutor::create(0, gko::OmpExecutor::create()),
+      gko::CudaExecutor::create(0, gko::OmpExecutor::create()),
+      gko::DpcppExecutor::create(0, gko::OmpExecutor::create()));
     auto batch_mat_size = gko::batch_dim<2>(
       a_ncells, gko::dim<2>(NUM_SPECIES + 1, NUM_SPECIES + 1));
     auto values_view = gko::Array<amrex::Real>::view(
