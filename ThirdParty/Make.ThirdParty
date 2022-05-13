@@ -64,7 +64,7 @@ ifeq ($(PELE_USE_GINKGO), TRUE)
     endif
   endif
   DEFINES    += -DPELE_USE_GINKGO
-  GINKGO_DIR ?= $(PELE_PHYSICS_HOME)/ThirdParty/INSTALL/$(configSpecificTPSuffix)
+  GINKGO_DIR := $(PELE_PHYSICS_HOME)/ThirdParty/INSTALL/$(configSpecificTPSuffix)
   GINKGO_LIBRARY ?= ginkgo
   LIBRARIES  += -L$(GINKGO_DIR)/lib -l$(GINKGO_LIBRARY) -lginkgo_device -lginkgo_omp -lginkgo_cuda -lginkgo_reference -lginkgo_hip -lginkgo_dpcpp
   INCLUDE_LOCATIONS += $(GINKGO_DIR)/include
