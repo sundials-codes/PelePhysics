@@ -129,8 +129,8 @@ PrecondDescriptor denseSimpleAJacPrecond{
   cvode::denseSimpleAJac, "dense simplified AJ-based preconditioner"};
 #endif
 
-constexpr int analytical_jacobian_no = 0;
-constexpr int analytical_jacobian_yes = 1;
+constexpr const int analytical_jacobian_no = 0;
+constexpr const int analytical_jacobian_yes = 1;
 
 std::unordered_map<std::string, SolverDescriptor> available_solver_types
 {
