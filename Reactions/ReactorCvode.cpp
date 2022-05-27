@@ -141,12 +141,12 @@ std::unordered_map<std::string, SolverDescriptor> available_solver_types
      analytical_jacobian_no,
      {},
      "fixed-point nonlinear solver"}},
-    {"gmres",
+    {"GMRES",
      SolverDescriptor{
        cvode::GMRES, analytical_jacobian_no, {}, "JFNK GMRES linear solver"}},
 #ifdef AMREX_USE_GPU
 // available with GPUs only
-#ifdef PELE_USE_KLU
+#ifdef PELE_USE_MAGMA
     {"magma_direct",
      SolverDescriptor{
        cvode::magmaDirect,
@@ -884,7 +884,6 @@ ReactorCvode::allocUserData(
         }
         amrex::Abort(abort_message);
       }
-      amrex::Abort(abort_message);
     }
   } else {
     std::string abort_message = "Wrong solve_type. Options are:\n";
@@ -1025,6 +1024,8 @@ ReactorCvode::allocUserData(
     SPARSITY_PREPROC_SYST_CSR(
       udata->csr_col_index_h, udata->csr_row_count_h, &HP, 1, 0);
 
+    amrex::Print() << ">>>>>>>>>>>>> DEBUG: Creating ginkgo matrix\n";
+
     auto gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
       gko::HipExecutor::create(0, gko::OmpExecutor::create()),
       gko::CudaExecutor::create(0, gko::OmpExecutor::create()),
@@ -1040,6 +1041,8 @@ ReactorCvode::allocUserData(
     auto gko_batch_matrix = gko::share(GkoBatchMatrixType::create(
       gko_exec, batch_mat_size, std::move(values_view), std::move(colidxs_view),
       std::move(rowptrs_view)));
+
+     amrex::Print() << ">>>>>>>>>>>>> DEBUG: Done creating ginkgo matrix\n";
 
     auto sun_batch_mat = new sundials::ginkgo::BlockMatrix<GkoBatchMatrixType>(
       gko_batch_matrix, *amrex::sundials::The_Sundials_Context());
@@ -1393,13 +1396,18 @@ ReactorCvode::react(
 #endif
   } else if (user_data->solve_type == cvode::ginkgoGMRES) {
 #ifdef PELE_USE_GINKGO
-    using GkoMatrixType           = gko::matrix::Csr<amrex::Real>;
-    using GkoBatchMatrixType      = gko::matrix::BatchCsr<amrex::Real>;
+    using GkoMatrixType      = gko::matrix::Csr<amrex::Real>;
+    using GkoBatchMatrixType = gko::matrix::BatchCsr<amrex::Real>;
+    using SUNMatrixType      = sundials::ginkgo::BlockMatrix<GkoBatchMatrixType>;
     using GkoSolverType           = gko::solver::BatchGmres<amrex::Real>;
-    using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
-
+    using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, SUNMatrixType>;
+    auto gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
+      gko::HipExecutor::create(0, gko::OmpExecutor::create()),
+      gko::CudaExecutor::create(0, gko::OmpExecutor::create()),
+      gko::DpcppExecutor::create(0, gko::OmpExecutor::create()));
     auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build().on(gko_exec));
-    precond_factory = nullptr;
+
+    amrex::Print() << ">>>>>>>>>>>>> DEBUG: Creating Ginkgo linear solver\n";
 
     auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
                                                precond_factory, user_data->ncells,
