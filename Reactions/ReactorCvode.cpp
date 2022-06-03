@@ -114,6 +114,11 @@ const std::unordered_map<std::string, SolverDescriptor> available_solver_types
 
 namespace {
 
+const auto gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
+  gko::HipExecutor::create(0, gko::OmpExecutor::create()),
+  gko::CudaExecutor::create(0, gko::OmpExecutor::create()),
+  gko::DpcppExecutor::create(0, gko::OmpExecutor::create()));
+
 using utils::PrecondDescriptor;
 using utils::SolverDescriptor;
 
@@ -132,7 +137,7 @@ PrecondDescriptor denseSimpleAJacPrecond{
 constexpr const int analytical_jacobian_no = 0;
 constexpr const int analytical_jacobian_yes = 1;
 
-std::unordered_map<std::string, SolverDescriptor> available_solver_types
+const std::unordered_map<std::string, SolverDescriptor> available_solver_types
 {
   // available for CPUs or GPUs
   {"fixed_point",
@@ -1024,12 +1029,6 @@ ReactorCvode::allocUserData(
     SPARSITY_PREPROC_SYST_CSR(
       udata->csr_col_index_h, udata->csr_row_count_h, &HP, 1, 0);
 
-    amrex::Print() << ">>>>>>>>>>>>> DEBUG: Creating ginkgo matrix\n";
-
-    auto gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
-      gko::HipExecutor::create(0, gko::OmpExecutor::create()),
-      gko::CudaExecutor::create(0, gko::OmpExecutor::create()),
-      gko::DpcppExecutor::create(0, gko::OmpExecutor::create()));
     auto batch_mat_size = gko::batch_dim<2>(
       a_ncells, gko::dim<2>(NUM_SPECIES + 1, NUM_SPECIES + 1));
     auto values_view = gko::Array<amrex::Real>::view(
@@ -1041,8 +1040,6 @@ ReactorCvode::allocUserData(
     auto gko_batch_matrix = gko::share(GkoBatchMatrixType::create(
       gko_exec, batch_mat_size, std::move(values_view), std::move(colidxs_view),
       std::move(rowptrs_view)));
-
-     amrex::Print() << ">>>>>>>>>>>>> DEBUG: Done creating ginkgo matrix\n";
 
     auto sun_batch_mat = new sundials::ginkgo::BlockMatrix<GkoBatchMatrixType>(
       gko_batch_matrix, *amrex::sundials::The_Sundials_Context());
@@ -1407,7 +1404,7 @@ ReactorCvode::react(
       gko::DpcppExecutor::create(0, gko::OmpExecutor::create()));
     auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build().on(gko_exec));
 
-    amrex::Print() << ">>>>>>>>>>>>> DEBUG: Creating Ginkgo linear solver\n";
+    auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<sunrealtype>::build().on(gko_exec));
 
     auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
                                                precond_factory, user_data->ncells,
