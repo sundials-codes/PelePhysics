@@ -244,8 +244,6 @@ ReactorCvode::init(int reactor_type, int ncells)
   pp.query("rtol", relTol);
   pp.query("atol", absTol);
   pp.query("atomic_reductions", atomic_reductions); // TODO: is this the right place, or should it be in the cvode pp namespace?
-  pp.query("max_nls_iters", max_nls_iters);
-  pp.query("max_fp_accel", max_fp_accel);
   pp.query("clean_init_massfrac", m_clean_init_massfrac);
   pp.query("max_nls_iters", max_nls_iters); // TODO: is this the right place, or should it be in the cvode pp namespace?
   pp.query("max_fp_accel", max_fp_accel); // TODO: is this the right place, or should it be in the cvode pp namespace?
@@ -517,6 +515,10 @@ ReactorCvode::init(int reactor_type, int ncells)
     if (utils::check_flag(&flag, "CVodeSetJacEvalFrequency", 1) != 0) {
       return (1);
     }
+  }
+  flag = CVodeSetEpsLin(cvode_mem, epslin); // linear solver tolerance factor
+  if (utils::check_flag(&flag, "CVodeSetEpsLin", 1) != 0) {
+    return (1);
   }
   flag = CVodeSetEpsLin(cvode_mem, epslin); // linear solver tolerance factor
   if (utils::check_flag(&flag, "CVodeSetEpsLin", 1) != 0) {
@@ -1405,6 +1407,31 @@ ReactorCvode::react(
     auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build().on(gko_exec));
 
     auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<sunrealtype>::build().on(gko_exec));
+    precond_factory = nullptr;
+
+    auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
+                                               precond_factory, user_data->ncells,
+                                               *amrex::sundials::The_Sundials_Context());
+
+    LS = LSview->get();
+    flag = CVodeSetLinearSolver(cvode_mem, LS, A);
+    if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
+      return (1);
+#else
+    amrex::Abort(
+      "Shoudn't be there. solve_type ginkgo<TYPE> only available with "
+      "PELE_USE_GINKGO = TRUE");
+#endif
+  } else if (user_data->solve_type == cvode::ginkgoBICGSTAB) {
+#ifdef PELE_USE_GINKGO
+    using GkoMatrixType           = gko::matrix::Csr<sunrealtype>;
+    using GkoBatchMatrixType      = gko::matrix::BatchCsr<sunrealtype>;
+    using SUNMatrixType           = sundials::ginkgo::BlockMatrix<GkoBatchMatrixType>;
+    using GkoSolverType           = gko::solver::BatchBicgstab<sunrealtype>;
+    using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, SUNMatrixType>;
+
+    auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<sunrealtype>::build().on(gko_exec));
+    precond_factory = nullptr;
 
     auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
                                                precond_factory, user_data->ncells,

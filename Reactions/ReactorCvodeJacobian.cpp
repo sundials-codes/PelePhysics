@@ -112,8 +112,7 @@ cJac(
 #endif
   } else if (solveType == ginkgoGMRES || solveType == ginkgoBICGSTAB) {
 #ifdef PELE_USE_GINKGO
-    using GkoBatchMatrixType = gko::matrix::BatchCsr<amrex::Real>;
-    auto Jgko = static_cast<sundials::ginkgo::BlockMatrix<GkoBatchMatrixType>*>(J->content)->gkomtx();
+    auto Jgko = static_cast<sundials::ginkgo::BlockMatrix<gko::matrix::BatchCsr<amrex::Real>>*>(J->content)->gkomtx();
 
     amrex::Real* yvec_d  = N_VGetDeviceArrayPointer(y_in);
     amrex::Real* Jdata   = Jgko->get_values();
@@ -140,8 +139,6 @@ cJac(
         }
       });
     amrex::Gpu::Device::streamSynchronize();
-
-    amrex::Print() << "HERE\n";
 #else
     amrex::Abort(
       "Calling cJac with solve_type = ginkgo<TYPE> requires PELE_USE_GINKGO = "
