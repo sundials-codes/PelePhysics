@@ -1563,10 +1563,10 @@ ReactorCvode::react(
       y, SUN_PREC_NONE, 0, *amrex::sundials::The_Sundials_Context());
     if (utils::check_flag((void*)LS, "SUNLinSol_SPGMR", 0))
       return (1);
-    flag = CVodeSetLinearSolver(cvode_mem, LS, NULL);
+    flag = CVodeSetLinearSolver(cvode_mem, LS, nullptr);
     if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
       return (1);
-    flag = CVodeSetJacTimes(cvode_mem, NULL, NULL);
+    flag = CVodeSetJacTimes(cvode_mem, nullptr, nullptr);
     if (utils::check_flag(&flag, "CVodeSetJacTimes", 1))
       return (1);
   } else if (user_data->solve_type == cvode::precGMRES) {
@@ -1918,17 +1918,6 @@ ReactorCvode::react(
     if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
       return (1);
     flag = CVodeSetJacTimes(cvode_mem, nullptr, nullptr);
-    if (utils::check_flag(&flag, "CVodeSetJacTimes", 1))
-      return (1);
-  } else if (user_data->solve_type == cvode::BCGS) {
-    LS = SUNLinSol_BCGS(
-      y, SUN_PREC_NONE, 0, *amrex::sundials::The_Sundials_Context());
-    if (utils::check_flag((void*)LS, "SUNLinSol_SPGMR", 0))
-      return (1);
-    flag = CVodeSetLinearSolver(cvode_mem, LS, NULL);
-    if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
-      return (1);
-    flag = CVodeSetJacTimes(cvode_mem, NULL, NULL);
     if (utils::check_flag(&flag, "CVodeSetJacTimes", 1))
       return (1);
   } else if (user_data->solve_type == cvode::precGMRES) {
