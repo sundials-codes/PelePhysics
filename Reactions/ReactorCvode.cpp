@@ -114,10 +114,12 @@ const std::unordered_map<std::string, SolverDescriptor> available_solver_types
 
 namespace {
 
+#ifdef PELE_USE_GINKGO
 const auto gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
   gko::HipExecutor::create(0, gko::OmpExecutor::create()),
   gko::CudaExecutor::create(0, gko::OmpExecutor::create()),
   gko::DpcppExecutor::create(0, gko::OmpExecutor::create()));
+#endif
 
 using utils::PrecondDescriptor;
 using utils::SolverDescriptor;
