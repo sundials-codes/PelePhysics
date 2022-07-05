@@ -247,9 +247,20 @@ ReactorCvode::init(int reactor_type, int ncells)
   pp.query("atol", absTol);
   pp.query("atomic_reductions", atomic_reductions); // TODO: is this the right place, or should it be in the cvode pp namespace?
   pp.query("clean_init_massfrac", m_clean_init_massfrac);
+  pp.query("epslin", epslin);
   pp.query("max_nls_iters", max_nls_iters); // TODO: is this the right place, or should it be in the cvode pp namespace?
   pp.query("max_fp_accel", max_fp_accel); // TODO: is this the right place, or should it be in the cvode pp namespace?
   pp.query("epslin", epslin); // TODO: is this the right place, or should it be in the cvode pp namespace?
+  pp.query("nlscoef", nlscoef);// TODO: is this the right place, or should it be in the cvode pp namespace?
+  pp.query("maxncf", maxncf);// TODO: is this the right place, or should it be in the cvode pp namespace?
+  pp.query("maxl", maxl);
+  pp.query("eta_cf", eta_cf);
+  pp.query("eta_max_fx", eta_max_fx);
+  pp.query("eta_min_fx", eta_min_fx);
+  pp.query("eta_max_gs", eta_max_gs);
+  pp.query("eta_min", eta_min);
+  pp.query("eta_min_ef", eta_min_ef);
+
   checkCvodeOptions();
 
   amrex::Print() << "Initializing CVODE:\n";
@@ -392,8 +403,8 @@ ReactorCvode::init(int reactor_type, int ncells)
   } else if (udata_g->solve_type == cvode::GMRES) {
     // Create the GMRES linear solver object
     LS = SUNLinSol_SPGMR(
-      y, SUN_PREC_NONE, 0, *amrex::sundials::The_Sundials_Context());
-    if (utils::check_flag(static_cast<void*>(LS), "SUNLinSol_SPGMR", 0) != 0) {
+      y, SUN_PREC_NONE, maxl, *amrex::sundials::The_Sundials_Context());
+    if (utils::check_flag((void*)LS, "SUNLinSol_SPGMR", 0) != 0) {
       return (1);
     }
 
@@ -493,6 +504,38 @@ ReactorCvode::init(int reactor_type, int ncells)
   // CVODE runtime options
   flag = CVodeSetMaxNonlinIters(cvode_mem, max_nls_iters); // Max newton iter.
   if (utils::check_flag(&flag, "CVodeSetMaxNonlinIters", 1) != 0) {
+    return (1);
+  }
+  flag = CVodeSetEpsLin(cvode_mem, epslin); // Linear solver tolerance factor
+  if (utils::check_flag(&flag, "CVodeSetEpsLin", 1) != 0) {
+    return (1);
+  }
+  flag = CVodeSetNonlinConvCoef(cvode_mem, nlscoef); // Nonlinear solver convergence safety factor
+  if (utils::check_flag(&flag, "CVodeSetNonlinConvCoef", 1) != 0) {
+    return (1);
+  }
+  flag = CVodeSetMaxConvFails(cvode_mem, maxncf); //Max nonlinear solver convergence failures per step
+  if (utils::check_flag(&flag, "CVodeSetMaxConvFails", 1) != 0) {
+    return (1);
+  }
+  flag = CVodeSetEtaConvFail(cvode_mem, eta_cf); // Step size change after solver failure
+  if (utils::check_flag(&flag, "CVodeSetEtaConvFail", 1) != 0) {
+    return (1);
+  }
+  flag = CVodeSetEtaFixedStepBounds(cvode_mem, eta_min_fx, eta_max_fx); // Fixed step eta bounds
+  if (utils::check_flag(&flag, "CVodeSetEtaFixedStepBounds", 1) != 0) {
+    return (1);
+  }
+  flag = CVodeSetEtaMax(cvode_mem, eta_max_gs); // Max step size change
+  if (utils::check_flag(&flag, "CVodeSetEtaMax", 1) != 0) {
+    return (1);
+  }
+  flag = CVodeSetEtaMin(cvode_mem, eta_min); // Min step size change
+  if (utils::check_flag(&flag, "CVodeSetEtaMin", 1) != 0) {
+    return (1);
+  }
+  flag = CVodeSetEtaMinErrFail(cvode_mem, eta_min_ef); // Min step size change on err test fail
+  if (utils::check_flag(&flag, "CVodeSetEtaMinErrFail", 1) != 0) {
     return (1);
   }
   flag = CVodeSetMaxErrTestFails(cvode_mem, 100); // Max Err.test failure

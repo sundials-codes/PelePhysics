@@ -165,6 +165,15 @@ private:
   bool m_clean_init_massfrac{false};
   int max_nls_iters{3};
   int max_fp_accel{2};
+  amrex::Real nlscoef{0.1};
+  int maxncf{10};
+  int maxl{5}; //number of GMRES vectors
+  amrex::Real eta_cf{0.25};
+  amrex::Real eta_max_fx{1.5};
+  amrex::Real eta_min_fx{0.0};
+  amrex::Real eta_max_gs{10.0};
+  amrex::Real eta_min{1.0};
+  amrex::Real eta_min_ef{0.1};
 
 #ifdef PELE_USE_GINKGO
   std::shared_ptr<const gko::Executor> gko_exec;
