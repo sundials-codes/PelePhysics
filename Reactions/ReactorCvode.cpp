@@ -254,6 +254,9 @@ ReactorCvode::init(int reactor_type, int ncells)
   pp.query("nlscoef", nlscoef);// TODO: is this the right place, or should it be in the cvode pp namespace?
   pp.query("maxncf", maxncf);// TODO: is this the right place, or should it be in the cvode pp namespace?
   pp.query("maxl", maxl);
+  pp.query("msbp", msbp);
+  pp.query("msbj", msbj);
+  pp.query("dgmax", dgmax);
   pp.query("eta_cf", eta_cf);
   pp.query("eta_max_fx", eta_max_fx);
   pp.query("eta_min_fx", eta_min_fx);
@@ -538,6 +541,14 @@ ReactorCvode::init(int reactor_type, int ncells)
   if (utils::check_flag(&flag, "CVodeSetEtaMinErrFail", 1) != 0) {
     return (1);
   }
+  flag = CVodeSetLSetupFrequency(cvode_mem, msbp); // Linear solver setup frequency
+  if (utils::check_flag(&flag, "CVodeSetLSetupFrequency", 1) != 0) {
+    return (1);
+  }
+  flag = CVodeSetDeltaGammaMaxLSetup(cvode_mem, dgmax); // Step size ratio limit signalling re-setup of linear solver
+  if (utils::check_flag(&flag, "CVodeSetDeltaGammaMaxLSetup", 1) != 0) {
+    return (1);
+  }
   flag = CVodeSetMaxErrTestFails(cvode_mem, 100); // Max Err.test failure
   if (utils::check_flag(&flag, "CVodeSetMaxErrTestFails", 1) != 0) {
     return (1);
@@ -556,14 +567,10 @@ ReactorCvode::init(int reactor_type, int ncells)
     return (1);
   }
   if (LS != nullptr) {
-    flag = CVodeSetJacEvalFrequency(cvode_mem, 100); // Max Jac age
+    flag = CVodeSetJacEvalFrequency(cvode_mem, msbj); // Max Jac age
     if (utils::check_flag(&flag, "CVodeSetJacEvalFrequency", 1) != 0) {
       return (1);
     }
-  }
-  flag = CVodeSetEpsLin(cvode_mem, epslin); // linear solver tolerance factor
-  if (utils::check_flag(&flag, "CVodeSetEpsLin", 1) != 0) {
-    return (1);
   }
   flag = CVodeSetEpsLin(cvode_mem, epslin); // linear solver tolerance factor
   if (utils::check_flag(&flag, "CVodeSetEpsLin", 1) != 0) {

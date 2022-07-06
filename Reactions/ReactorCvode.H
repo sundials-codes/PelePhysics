@@ -168,6 +168,9 @@ private:
   amrex::Real nlscoef{0.1};
   int maxncf{10};
   int maxl{5}; //number of GMRES vectors
+  int msbp{20};
+  int msbj{51};
+  amrex::Real dgmax{0.3};
   amrex::Real eta_cf{0.25};
   amrex::Real eta_max_fx{1.5};
   amrex::Real eta_min_fx{0.0};
