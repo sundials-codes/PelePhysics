@@ -151,6 +151,9 @@ const std::unordered_map<std::string, SolverDescriptor> available_solver_types
     {"GMRES",
      SolverDescriptor{
        cvode::GMRES, analytical_jacobian_no, {}, "JFNK GMRES linear solver"}},
+    {"BCGS",
+     SolverDescriptor{
+       cvode::BCGS, analytical_jacobian_no, {}, "JFNK BiCGStab linear solver"}},
 #ifdef AMREX_USE_GPU
 // available with GPUs only
 #ifdef PELE_USE_MAGMA
@@ -406,6 +409,20 @@ ReactorCvode::init(int reactor_type, int ncells)
   } else if (udata_g->solve_type == cvode::GMRES) {
     // Create the GMRES linear solver object
     LS = SUNLinSol_SPGMR(
+      y, SUN_PREC_NONE, maxl, *amrex::sundials::The_Sundials_Context());
+    if (utils::check_flag((void*)LS, "SUNLinSol_SPGMR", 0) != 0) {
+      return (1);
+    }
+
+    // Set CVode linear solver to LS
+    flag = CVodeSetLinearSolver(cvode_mem, LS, nullptr);
+    if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1) != 0) {
+      return (1);
+    }
+
+  } else if (udata_g->solve_type == cvode::BCGS) {
+    // Create the BiCGStab linear solver object
+    LS = SUNLinSol_SPBGCS(
       y, SUN_PREC_NONE, maxl, *amrex::sundials::The_Sundials_Context());
     if (utils::check_flag((void*)LS, "SUNLinSol_SPGMR", 0) != 0) {
       return (1);
@@ -1538,6 +1555,17 @@ ReactorCvode::react(
     flag = CVodeSetJacTimes(cvode_mem, nullptr, nullptr);
     if (utils::check_flag(&flag, "CVodeSetJacTimes", 1))
       return (1);
+  } else if (user_data->solve_type == cvode::BCGS) {
+    LS = SUNLinSol_SPBCGS(
+      y, SUN_PREC_NONE, 0, *amrex::sundials::The_Sundials_Context());
+    if (utils::check_flag((void*)LS, "SUNLinSol_SPGMR", 0))
+      return (1);
+    flag = CVodeSetLinearSolver(cvode_mem, LS, NULL);
+    if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
+      return (1);
+    flag = CVodeSetJacTimes(cvode_mem, NULL, NULL);
+    if (utils::check_flag(&flag, "CVodeSetJacTimes", 1))
+      return (1);
   } else if (user_data->solve_type == cvode::precGMRES) {
     LS = SUNLinSol_SPGMR(
       y, SUN_PREC_LEFT, 0, *amrex::sundials::The_Sundials_Context());
@@ -1887,6 +1915,17 @@ ReactorCvode::react(
     if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
       return (1);
     flag = CVodeSetJacTimes(cvode_mem, nullptr, nullptr);
+    if (utils::check_flag(&flag, "CVodeSetJacTimes", 1))
+      return (1);
+  } else if (user_data->solve_type == cvode::BCGS) {
+    LS = SUNLinSol_BCGS(
+      y, SUN_PREC_NONE, 0, *amrex::sundials::The_Sundials_Context());
+    if (utils::check_flag((void*)LS, "SUNLinSol_SPGMR", 0))
+      return (1);
+    flag = CVodeSetLinearSolver(cvode_mem, LS, NULL);
+    if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
+      return (1);
+    flag = CVodeSetJacTimes(cvode_mem, NULL, NULL);
     if (utils::check_flag(&flag, "CVodeSetJacTimes", 1))
       return (1);
   } else if (user_data->solve_type == cvode::precGMRES) {
