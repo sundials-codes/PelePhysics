@@ -109,6 +109,7 @@ enum linSolveType {
   customDirect,
   magmaDirect,
   GMRES,
+  BCGS,
   precGMRES,
   ginkgoGMRES,
   ginkgoBICGSTAB
@@ -122,6 +123,7 @@ enum linSolveType {
   sparseDirect,
   customDirect,
   GMRES,
+  BCGS,
   precGMRES,
   hackDumpSparsePattern
 };

@@ -54,6 +54,7 @@ namespace pele::physics::reactions {
 class ReactorCvode : public ReactorBase::Register<ReactorCvode>
 {
 public:
+  int cvode_call_index = 0;
   static std::string identifier() { return "ReactorCvode"; }
 
   using Ordering = utils::YCOrder;
