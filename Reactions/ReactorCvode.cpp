@@ -1481,10 +1481,13 @@ ReactorCvode::react(
     auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
                                                precond_factory, user_data->ncells,
                                                *amrex::sundials::The_Sundials_Context());
-
+    LSview->setEnableScaling(user_data->scaling);
     LS = LSview->get();
     flag = CVodeSetLinearSolver(cvode_mem, LS, A);
     if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
+      return (1);
+    flag = CVodeSetLSNormFactor(cvode_mem, std::sqrt(NUM_SPECIES + 1));
+    if (utils::check_flag(&flag, "CVodeSetLSNormFactor", 1))
       return (1);
 #else
     amrex::Abort(
