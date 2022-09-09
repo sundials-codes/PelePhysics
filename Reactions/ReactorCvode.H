@@ -13,6 +13,7 @@
 #include <sunmatrix/sunmatrix_sparse.h>
 #include <sunlinsol/sunlinsol_dense.h>
 #include <sunlinsol/sunlinsol_spgmr.h>
+#include <sunlinsol/sunlinsol_spbcgs.h>
 #include <sunnonlinsol/sunnonlinsol_fixedpoint.h>
 
 #ifdef AMREX_USE_HIP
@@ -153,31 +154,13 @@ private:
   ) const;
   void freeUserData(CVODEUserData* data_wk);
 
+  int m_reactor_type{0};
+  utils::FlattenOps<Ordering> flatten_ops;
+  bool m_clean_init_massfrac{false};
+
+  // CVODE Integrator tolerances
   amrex::Real relTol{1e-6};
   amrex::Real absTol{1e-10};
-  amrex::Real epslin{0.0};
-  utils::FlattenOps<Ordering> flatten_ops;
-  int m_reactor_type{0};
-#if defined(AMREX_USE_HIP)
-  int atomic_reductions{0};
-#else
-  int atomic_reductions{1};
-#endif
-  bool m_clean_init_massfrac{false};
-  int max_nls_iters{3};
-  int max_fp_accel{2};
-  amrex::Real nlscoef{0.1};
-  int maxncf{10};
-  int maxl{5}; //number of GMRES vectors
-  int msbp{20};
-  int msbj{51};
-  amrex::Real dgmax{0.3};
-  amrex::Real eta_cf{0.25};
-  amrex::Real eta_max_fx{1.5};
-  amrex::Real eta_min_fx{0.0};
-  amrex::Real eta_max_gs{10.0};
-  amrex::Real eta_min{1.0};
-  amrex::Real eta_min_ef{0.1};
 
 #ifdef PELE_USE_GINKGO
   std::shared_ptr<const gko::Executor> gko_exec;
@@ -191,6 +174,34 @@ private:
   void* cvode_mem = nullptr;
   CVODEUserData* udata_g = nullptr;
 #endif
+
+  // This block of CVODE parameters are initialized to the CVODE default values.
+  // WARNING: it is unwise to change these without a really good reason. The
+  // default values have been empircally proven to be robust and optimal for many
+  // types of problems. It may be possible to achieve better performance for a specific
+  // problem with different values, so the parameters can be changed, but do so with extreme care.
+
+  // CVODE integrator parameters related to time step size selection:
+  // https://sundials.readthedocs.io/en/latest/cvode/Usage/index.html#id10
+  amrex::Real eta_cf{0.25};
+  amrex::Real eta_max_fx{1.5};
+  amrex::Real eta_max_gs{10.0};
+  amrex::Real eta_min_ef{0.1};
+  amrex::Real eta_min_fx{0.0};
+  amrex::Real eta_min{1.0};
+  // CVODE integrator parameters controlling linear solver
+  // https://sundials.readthedocs.io/en/latest/cvode/Usage/index.html#id7
+  amrex::Real dgmax{0.3}; // Max allowed gamma change without a linear solver setup
+  amrex::Real epslin{0.0}; // Ratio between linear and nonlinear tolerances
+  int msbj{51}; // Jacobian / preconditioner update frequency
+  int msbp{20}; // Linear solver setup frequency (e.g. refactorization frequency)
+  int maxl{5};  // max # of Krylov subspace vectors (for GMRES)
+  // CVODE integrator parameters controlling nonlinear solver
+  // https://sundials.readthedocs.io/en/latest/cvode/Usage/index.html#id9
+  amrex::Real nonlin_conv_coef{0.1}; // Coefficient in the nonlinear convergence test
+  int max_nls_iters{3}; // max # of nonlinear solver iterations before considering
+  int max_conv_fails{10}; // max # of nonlinear solver convergence failures before
+  int max_fp_accel{0}; // max # of Anderson Acceleration vectors (if using the fixed-point nonlinear solver)
 };
 } // namespace pele::physics::reactions
 #endif

@@ -244,28 +244,30 @@ ReactorCvode::init(int reactor_type, int ncells)
 
   m_reactor_type = reactor_type;
   ReactorTypes::check_reactor_type(m_reactor_type);
+
   amrex::ParmParse pp("ode");
+  pp.query("clean_init_massfrac", m_clean_init_massfrac);
   pp.query("verbose", verbose);
   pp.query("rtol", relTol);
   pp.query("atol", absTol);
-  pp.query("atomic_reductions", atomic_reductions); // TODO: is this the right place, or should it be in the cvode pp namespace?
-  pp.query("clean_init_massfrac", m_clean_init_massfrac);
-  pp.query("epslin", epslin);
-  pp.query("max_nls_iters", max_nls_iters); // TODO: is this the right place, or should it be in the cvode pp namespace?
-  pp.query("max_fp_accel", max_fp_accel); // TODO: is this the right place, or should it be in the cvode pp namespace?
-  pp.query("epslin", epslin); // TODO: is this the right place, or should it be in the cvode pp namespace?
-  pp.query("nlscoef", nlscoef);// TODO: is this the right place, or should it be in the cvode pp namespace?
-  pp.query("maxncf", maxncf);// TODO: is this the right place, or should it be in the cvode pp namespace?
-  pp.query("maxl", maxl);
-  pp.query("msbp", msbp);
-  pp.query("msbj", msbj);
-  pp.query("dgmax", dgmax);
-  pp.query("eta_cf", eta_cf);
-  pp.query("eta_max_fx", eta_max_fx);
-  pp.query("eta_min_fx", eta_min_fx);
-  pp.query("eta_max_gs", eta_max_gs);
-  pp.query("eta_min", eta_min);
-  pp.query("eta_min_ef", eta_min_ef);
+  pp.query("atomic_reductions", atomic_reductions);
+
+  amrex::ParmParse ppcv("cvode");
+  ppcv.query("dgmax", dgmax);
+  ppcv.query("epslin", epslin);
+  ppcv.query("eta_cf", eta_cf);
+  ppcv.query("eta_max_fx", eta_max_fx);
+  ppcv.query("eta_max_gs", eta_max_gs);
+  ppcv.query("eta_min_ef", eta_min_ef);
+  ppcv.query("eta_min_fx", eta_min_fx);
+  ppcv.query("eta_min", eta_min);
+  ppcv.query("max_fp_accel", max_fp_accel);
+  ppcv.query("max_nls_iters", max_nls_iters);
+  ppcv.query("maxl", maxl);
+  ppcv.query("max_conv_fails", max_conv_fails);
+  ppcv.query("msbj", msbj);
+  ppcv.query("msbp", msbp);
+  ppcv.query("nonlin_conv_coef", nonlin_conv_coef);
 
   checkCvodeOptions();
 
@@ -530,11 +532,11 @@ ReactorCvode::init(int reactor_type, int ncells)
   if (utils::check_flag(&flag, "CVodeSetEpsLin", 1) != 0) {
     return (1);
   }
-  flag = CVodeSetNonlinConvCoef(cvode_mem, nlscoef); // Nonlinear solver convergence safety factor
+  flag = CVodeSetNonlinConvCoef(cvode_mem, nonlin_conv_coef); // Nonlinear solver convergence safety factor
   if (utils::check_flag(&flag, "CVodeSetNonlinConvCoef", 1) != 0) {
     return (1);
   }
-  flag = CVodeSetMaxConvFails(cvode_mem, maxncf); //Max nonlinear solver convergence failures per step
+  flag = CVodeSetMaxConvFails(cvode_mem, max_conv_fails); //Max nonlinear solver convergence failures per step
   if (utils::check_flag(&flag, "CVodeSetMaxConvFails", 1) != 0) {
     return (1);
   }
@@ -1911,6 +1913,17 @@ ReactorCvode::react(
 #endif
   } else if (user_data->solve_type == cvode::GMRES) {
     LS = SUNLinSol_SPGMR(
+      y, SUN_PREC_NONE, 0, *amrex::sundials::The_Sundials_Context());
+    if (utils::check_flag(static_cast<void*>(LS), "SUNLinSol_SPGMR", 0))
+      return (1);
+    flag = CVodeSetLinearSolver(cvode_mem, LS, nullptr);
+    if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
+      return (1);
+    flag = CVodeSetJacTimes(cvode_mem, nullptr, nullptr);
+    if (utils::check_flag(&flag, "CVodeSetJacTimes", 1))
+      return (1);
+  } else if (user_data->solve_type == cvode::BCGS) {
+    LS = SUNLinSol_SPBCGS(
       y, SUN_PREC_NONE, 0, *amrex::sundials::The_Sundials_Context());
     if (utils::check_flag(static_cast<void*>(LS), "SUNLinSol_SPGMR", 0))
       return (1);
