@@ -272,7 +272,6 @@ ReactorCvode::init(int reactor_type, int ncells)
   checkCvodeOptions();
 
   amrex::Print() << "Initializing CVODE:\n";
-
   if (atomic_reductions != 0) {
     amrex::Print() << "  Using atomic reductions\n";
   } else {
@@ -1456,6 +1455,7 @@ ReactorCvode::react(
     LS = SUNLinSol_MagmaDense(y, A, *amrex::sundials::The_Sundials_Context());
     if (utils::check_flag(static_cast<void*>(LS), "SUNLinSol_MagmaDense", 0))
       return (1);
+    amrex::Print() << "     Using MAGMA batched dense linear solver\n";
     flag = CVodeSetLinearSolver(cvode_mem, LS, A);
     if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
       return (1);
@@ -1478,13 +1478,12 @@ ReactorCvode::react(
     auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build().on(gko_exec));
 
     auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<sunrealtype>::build().on(gko_exec));
-    precond_factory = nullptr;
-
     auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
                                                precond_factory, user_data->ncells,
                                                *amrex::sundials::The_Sundials_Context());
     LSview->setEnableScaling(user_data->scaling);
     LS = LSview->get();
+    amrex::Print() << "     Using Ginkgo GMRES linear solver\n";
     flag = CVodeSetLinearSolver(cvode_mem, LS, A);
     if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
       return (1);
@@ -1502,11 +1501,8 @@ ReactorCvode::react(
     using GkoBatchMatrixType      = gko::matrix::BatchCsr<sunrealtype>;
     using SUNMatrixType           = sundials::ginkgo::BlockMatrix<GkoBatchMatrixType>;
     using GkoSolverType           = gko::solver::BatchBicgstab<sunrealtype>;
-    using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, SUNMatrixType>;
-
+    using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
     auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<sunrealtype>::build().on(gko_exec));
-    precond_factory = nullptr;
-
     auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
                                                precond_factory, user_data->ncells,
                                                *amrex::sundials::The_Sundials_Context());
