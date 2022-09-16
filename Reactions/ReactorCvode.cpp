@@ -271,6 +271,7 @@ ReactorCvode::init(int reactor_type, int ncells)
   ppcv.query("msbj", msbj);
   ppcv.query("msbp", msbp);
   ppcv.query("nonlin_conv_coef", nonlin_conv_coef);
+  ppcv.query("print_profile_every_step", sunprofiler_print_every_step);
 
   checkCvodeSolveType();
 
@@ -1718,7 +1719,7 @@ ReactorCvode::react(
 #endif
 
 #ifdef SUNDIALS_BUILD_WITH_PROFILING
-  if (m_print_profiling) {
+  if (sunprofiler_print_every_step) {
     SUNProfiler_Print(sun_profiler, stdout);
   }
 #endif

@@ -159,6 +159,9 @@ private:
   int m_reactor_type{0};
   utils::FlattenOps<Ordering> flatten_ops;
   bool m_clean_init_massfrac{false};
+  int solve_type{-1};
+  int analytical_jacobian{0};
+  int precond_type{-1};
 
   // CVODE Integrator tolerances
   amrex::Real relTol{1e-6};
@@ -177,13 +180,10 @@ private:
   CVODEUserData* udata_g{nullptr};
 #endif
 
-  int solve_type{-1};
-  int analytical_jacobian{0};
-  int precond_type{-1};
-
   int max_order{2};
   int max_err_test_fails{100};
   int max_num_steps{100000};
+  bool sunprofiler_print_every_step{false};
   bool linear_solver_scaling{true}; // temporary, remove after debugging
 
   // This block of CVODE parameters are initialized to the CVODE default values.
