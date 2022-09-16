@@ -36,8 +36,6 @@ struct CVODEUserData
   amrex::Real dt_save;     // Internal cvode dt holder
   int ncells;              // Number of cells in solve
   int verbose;             // Verbose
-  int maxOrder;            // CVODE max order
-  int scaling; // temporary, remove after debugging
   int reactor_type;        // Either HP (LM) or UV (C)
   int analytical_jacobian; // Analytical Jacobian 'On' flag
   int solve_type;          // Type of linear solve for Newton direction
