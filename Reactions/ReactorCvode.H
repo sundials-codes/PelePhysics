@@ -142,7 +142,9 @@ public:
   }
 
 private:
-  void checkCvodeOptions() const;
+  void checkCvodeSolveType();
+  void printExtraSolveInformation() const;
+  int setCvodeOptions(void* cvode_mem, bool analytical_jacobian) const;
   void allocUserData(
     CVODEUserData* udata,
     int a_ncells
@@ -167,19 +169,29 @@ private:
 #endif
 
 #ifndef AMREX_USE_GPU
-  N_Vector y = nullptr;
-  SUNLinearSolver LS = nullptr;
-  SUNNonlinearSolver NLS = nullptr;
-  SUNMatrix A = nullptr;
-  void* cvode_mem = nullptr;
-  CVODEUserData* udata_g = nullptr;
+  N_Vector y{nullptr};
+  SUNLinearSolver LS{nullptr};
+  SUNNonlinearSolver NLS{nullptr};
+  SUNMatrix A{nullptr};
+  void* cvode_mem{nullptr};
+  CVODEUserData* udata_g{nullptr};
 #endif
+
+  int solve_type{-1};
+  int analytical_jacobian{0};
+  int precond_type{-1};
+
+  int max_order{2};
+  int max_err_test_fails{100};
+  int max_num_steps{100000};
+  bool linear_solver_scaling{true}; // temporary, remove after debugging
 
   // This block of CVODE parameters are initialized to the CVODE default values.
   // WARNING: it is unwise to change these without a really good reason. The
-  // default values have been empircally proven to be robust and optimal for many
-  // types of problems. It may be possible to achieve better performance for a specific
-  // problem with different values, so the parameters can be changed, but do so with extreme care.
+  // default values have been empircally proven to be robust and optimal for
+  // many types of problems. It may be possible to achieve better performance
+  // for a specific problem with different values, so the parameters can be
+  // changed, but do so with extreme care.
 
   // CVODE integrator parameters related to time step size selection:
   // https://sundials.readthedocs.io/en/latest/cvode/Usage/index.html#id10
@@ -191,17 +203,23 @@ private:
   amrex::Real eta_min{1.0};
   // CVODE integrator parameters controlling linear solver
   // https://sundials.readthedocs.io/en/latest/cvode/Usage/index.html#id7
-  amrex::Real dgmax{0.3}; // Max allowed gamma change without a linear solver setup
+  amrex::Real dgmax{
+    0.3}; // Max allowed gamma change without a linear solver setup
   amrex::Real epslin{0.0}; // Ratio between linear and nonlinear tolerances
-  int msbj{51}; // Jacobian / preconditioner update frequency
-  int msbp{20}; // Linear solver setup frequency (e.g. refactorization frequency)
-  int maxl{5};  // max # of Krylov subspace vectors (for GMRES)
+  int msbj{51};            // Jacobian / preconditioner update frequency
+  int msbp{
+    20};       // Linear solver setup frequency (e.g. refactorization frequency)
+  int maxl{5}; // max # of Krylov subspace vectors (for GMRES)
   // CVODE integrator parameters controlling nonlinear solver
   // https://sundials.readthedocs.io/en/latest/cvode/Usage/index.html#id9
-  amrex::Real nonlin_conv_coef{0.1}; // Coefficient in the nonlinear convergence test
-  int max_nls_iters{3}; // max # of nonlinear solver iterations before considering
-  int max_conv_fails{10}; // max # of nonlinear solver convergence failures before
-  int max_fp_accel{0}; // max # of Anderson Acceleration vectors (if using the fixed-point nonlinear solver)
+  amrex::Real nonlin_conv_coef{
+    0.1}; // Coefficient in the nonlinear convergence test
+  int max_nls_iters{
+    3}; // max # of nonlinear solver iterations before considering
+  int max_conv_fails{
+    10};               // max # of nonlinear solver convergence failures before
+  int max_fp_accel{0}; // max # of Anderson Acceleration vectors (if using the
+                       // fixed-point nonlinear solver)
 };
 } // namespace pele::physics::reactions
 #endif

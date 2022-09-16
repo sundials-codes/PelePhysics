@@ -253,6 +253,9 @@ ReactorCvode::init(int reactor_type, int ncells)
   pp.query("atomic_reductions", atomic_reductions);
 
   amrex::ParmParse ppcv("cvode");
+  ppcv.query("max_order", max_order);
+  ppcv.query("max_err_test_fails", max_err_test_fails);
+  ppcv.query("scaling", linear_solver_scaling);
   ppcv.query("dgmax", dgmax);
   ppcv.query("epslin", epslin);
   ppcv.query("eta_cf", eta_cf);
@@ -269,7 +272,7 @@ ReactorCvode::init(int reactor_type, int ncells)
   ppcv.query("msbp", msbp);
   ppcv.query("nonlin_conv_coef", nonlin_conv_coef);
 
-  checkCvodeOptions();
+  checkCvodeSolveType();
 
   amrex::Print() << "Initializing CVODE:\n";
   if (atomic_reductions != 0) {
@@ -277,6 +280,8 @@ ReactorCvode::init(int reactor_type, int ncells)
   } else {
     amrex::Print() << "  Using LDS reductions\n";
   }
+
+  printExtraSolveInformation();
 
 #ifndef AMREX_USE_GPU
   // ----------------------------------------------------------
@@ -522,78 +527,9 @@ ReactorCvode::init(int reactor_type, int ncells)
     }
   }
 
-  // CVODE runtime options
-  flag = CVodeSetMaxNonlinIters(cvode_mem, max_nls_iters); // Max newton iter.
-  if (utils::check_flag(&flag, "CVodeSetMaxNonlinIters", 1) != 0) {
+  flag = setCVodeOptions(cvode_mem, LS != nullptr);
+  if (utils::check_flag(&flag, "setCvodeOptions", 1))
     return (1);
-  }
-  flag = CVodeSetEpsLin(cvode_mem, epslin); // Linear solver tolerance factor
-  if (utils::check_flag(&flag, "CVodeSetEpsLin", 1) != 0) {
-    return (1);
-  }
-  flag = CVodeSetNonlinConvCoef(cvode_mem, nonlin_conv_coef); // Nonlinear solver convergence safety factor
-  if (utils::check_flag(&flag, "CVodeSetNonlinConvCoef", 1) != 0) {
-    return (1);
-  }
-  flag = CVodeSetMaxConvFails(cvode_mem, max_conv_fails); //Max nonlinear solver convergence failures per step
-  if (utils::check_flag(&flag, "CVodeSetMaxConvFails", 1) != 0) {
-    return (1);
-  }
-  flag = CVodeSetEtaConvFail(cvode_mem, eta_cf); // Step size change after solver failure
-  if (utils::check_flag(&flag, "CVodeSetEtaConvFail", 1) != 0) {
-    return (1);
-  }
-  flag = CVodeSetEtaFixedStepBounds(cvode_mem, eta_min_fx, eta_max_fx); // Fixed step eta bounds
-  if (utils::check_flag(&flag, "CVodeSetEtaFixedStepBounds", 1) != 0) {
-    return (1);
-  }
-  flag = CVodeSetEtaMax(cvode_mem, eta_max_gs); // Max step size change
-  if (utils::check_flag(&flag, "CVodeSetEtaMax", 1) != 0) {
-    return (1);
-  }
-  flag = CVodeSetEtaMin(cvode_mem, eta_min); // Min step size change
-  if (utils::check_flag(&flag, "CVodeSetEtaMin", 1) != 0) {
-    return (1);
-  }
-  flag = CVodeSetEtaMinErrFail(cvode_mem, eta_min_ef); // Min step size change on err test fail
-  if (utils::check_flag(&flag, "CVodeSetEtaMinErrFail", 1) != 0) {
-    return (1);
-  }
-  flag = CVodeSetLSetupFrequency(cvode_mem, msbp); // Linear solver setup frequency
-  if (utils::check_flag(&flag, "CVodeSetLSetupFrequency", 1) != 0) {
-    return (1);
-  }
-  flag = CVodeSetDeltaGammaMaxLSetup(cvode_mem, dgmax); // Step size ratio limit signalling re-setup of linear solver
-  if (utils::check_flag(&flag, "CVodeSetDeltaGammaMaxLSetup", 1) != 0) {
-    return (1);
-  }
-  flag = CVodeSetMaxErrTestFails(cvode_mem, 100); // Max Err.test failure
-  if (utils::check_flag(&flag, "CVodeSetMaxErrTestFails", 1) != 0) {
-    return (1);
-  }
-  flag = CVodeSetErrHandlerFn(
-    cvode_mem, cvode::cvodeErrHandler, nullptr); // Err. handler funct.
-  if (utils::check_flag(&flag, "CVodeSetErrHandlerFn", 1) != 0) {
-    return (1);
-  }
-  flag = CVodeSetMaxNumSteps(cvode_mem, 10000); // Max substeps
-  if (utils::check_flag(&flag, "CVodeSetMaxNumSteps", 1) != 0) {
-    return (1);
-  }
-  flag = CVodeSetMaxOrd(cvode_mem, udata_g->maxOrder); // Max order
-  if (utils::check_flag(&flag, "CVodeSetMaxOrd", 1) != 0) {
-    return (1);
-  }
-  if (LS != nullptr) {
-    flag = CVodeSetJacEvalFrequency(cvode_mem, msbj); // Max Jac age
-    if (utils::check_flag(&flag, "CVodeSetJacEvalFrequency", 1) != 0) {
-      return (1);
-    }
-  }
-  flag = CVodeSetEpsLin(cvode_mem, epslin); // linear solver tolerance factor
-  if (utils::check_flag(&flag, "CVodeSetEpsLin", 1) != 0) {
-    return (1);
-  }
 
   // End of CPU section
 #endif
@@ -602,7 +538,7 @@ ReactorCvode::init(int reactor_type, int ncells)
 }
 
 void
-ReactorCvode::checkCvodeOptions() const
+ReactorCvode::checkCvodeSolveType()
 {
   if (verbose > 0) {
     amrex::Print() << "Number of species in mech is " << NUM_SPECIES << "\n";
@@ -611,9 +547,6 @@ ReactorCvode::checkCvodeOptions() const
   std::string solve_type_str = "none";
   amrex::ParmParse ppcv("cvode");
   ppcv.query("solve_type", solve_type_str);
-  int solve_type = -1;
-  int analytical_jacobian = 0;
-  int precond_type = -1;
 
   auto st = available_solver_types.find(solve_type_str);
   if (st != available_solver_types.end()) {
@@ -621,7 +554,7 @@ ReactorCvode::checkCvodeOptions() const
     analytical_jacobian = st->second.analytical_jacobian;
 
     if (verbose > 0)
-      amrex::Print() << " Using a " << st->second.text_description << "\n";
+      amrex::Print() << "  Using a " << st->second.text_description << "\n";
 
     auto precond_types = st->second.precond_types;
     if (precond_types.size() > 0) {
@@ -657,7 +590,12 @@ ReactorCvode::checkCvodeOptions() const
     }
     amrex::Abort(abort_message);
   }
+}
 
+
+void
+ReactorCvode::printExtraSolveInformation() const
+{
   // Print additional information
   if (precond_type == cvode::sparseSimpleAJac) {
     int nJdata = 0;
@@ -913,6 +851,82 @@ ReactorCvode::checkCvodeOptions() const
 #endif
 }
 
+int
+ReactorCvode::setCvodeOptions(void* cvode_mem, bool analytical_jacobian) const
+{
+  int flag = 0;
+
+  flag = CVodeSetMaxNonlinIters(cvode_mem, max_nls_iters); // Max newton iter.
+  if (utils::check_flag(&flag, "CVodeSetMaxNonlinIters", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetEpsLin(cvode_mem, epslin); // Linear solver tolerance factor
+  if (utils::check_flag(&flag, "CVodeSetEpsLin", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetNonlinConvCoef(cvode_mem, nonlin_conv_coef); // Nonlinear solver convergence safety factor
+  if (utils::check_flag(&flag, "CVodeSetNonlinConvCoef", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetMaxConvFails(cvode_mem, max_conv_fails); //Max nonlinear solver convergence failures per step
+  if (utils::check_flag(&flag, "CVodeSetMaxConvFails", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetEtaConvFail(cvode_mem, eta_cf); // Step size change after solver failure
+  if (utils::check_flag(&flag, "CVodeSetEtaConvFail", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetEtaFixedStepBounds(cvode_mem, eta_min_fx, eta_max_fx); // Fixed step eta bounds
+  if (utils::check_flag(&flag, "CVodeSetEtaFixedStepBounds", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetEtaMax(cvode_mem, eta_max_gs); // Max step size change
+  if (utils::check_flag(&flag, "CVodeSetEtaMax", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetEtaMin(cvode_mem, eta_min); // Min step size change
+  if (utils::check_flag(&flag, "CVodeSetEtaMin", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetEtaMinErrFail(cvode_mem, eta_min_ef); // Min step size change on err test fail
+  if (utils::check_flag(&flag, "CVodeSetEtaMinErrFail", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetLSetupFrequency(cvode_mem, msbp); // Linear solver setup frequency
+  if (utils::check_flag(&flag, "CVodeSetLSetupFrequency", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetDeltaGammaMaxLSetup(cvode_mem, dgmax); // Step size ratio limit signalling re-setup of linear solver
+  if (utils::check_flag(&flag, "CVodeSetDeltaGammaMaxLSetup", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetMaxErrTestFails(cvode_mem, max_err_test_fails); // Max Err.test failure
+  if (utils::check_flag(&flag, "CVodeSetMaxErrTestFails", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetErrHandlerFn(
+    cvode_mem, cvode::cvodeErrHandler, nullptr); // Err. handler funct.
+  if (utils::check_flag(&flag, "CVodeSetErrHandlerFn", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetMaxNumSteps(cvode_mem, max_num_steps); // Max substeps
+  if (utils::check_flag(&flag, "CVodeSetMaxNumSteps", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetMaxOrd(cvode_mem, max_order); // Max order
+  if (utils::check_flag(&flag, "CVodeSetMaxOrd", 1) != 0) {
+    return 1;
+  }
+  if (analytical_jacobian) {
+    flag = CVodeSetJacEvalFrequency(cvode_mem, msbj); // Max Jac age
+    if (utils::check_flag(&flag, "CVodeSetJacEvalFrequency", 1) != 0) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
 void
 ReactorCvode::allocUserData(
   CVODEUserData* udata,
@@ -924,53 +938,48 @@ ReactorCvode::allocUserData(
 #endif
 ) const
 {
-  // Query options
-  std::string solve_type_str = "none";
-  amrex::ParmParse ppcv("cvode");
-  udata->maxOrder = 2;
-  ppcv.query("max_order", udata->maxOrder);
-  udata->scaling = true;
-  ppcv.query("scaling", udata->scaling);
-  ppcv.query("solve_type", solve_type_str);
+  // // Query options
+  // std::string solve_type_str = "none";
+  // amrex::ParmParse ppcv("cvode");
+  // ppcv.query("solve_type", solve_type_str);
 
-  // Defaults
-  udata->solve_type = -1;
-  udata->analytical_jacobian = 0;
-  udata->precond_type = -1;
+  udata->solve_type = this->solve_type;
+  udata->analytical_jacobian = this->analytical_jacobian;
+  udata->precond_type = this->precond_type;
 
-  // Check for valid solve_type and precond_type, and set
-  // udata->solve_type, udata->analytical_jacobian, udata->precond_type.
-  auto st = available_solver_types.find(solve_type_str);
-  if (st != available_solver_types.end()) {
-    udata->solve_type = st->second.identifier;
-    udata->analytical_jacobian = st->second.analytical_jacobian;
-    auto precond_types = st->second.precond_types;
-    if (precond_types.size() > 0) {
-      std::string prec_type_str = "";
-      ppcv.query("precond_type", prec_type_str);
+  // // Check for valid solve_type and precond_type, and set
+  // // udata->solve_type, udata->analytical_jacobian, udata->precond_type.
+  // auto st = available_solver_types.find(solve_type_str);
+  // if (st != available_solver_types.end()) {
+  //   udata->solve_type = st->second.identifier;
+  //   udata->analytical_jacobian = st->second.analytical_jacobian;
+  //   auto precond_types = st->second.precond_types;
+  //   if (precond_types.size() > 0) {
+  //     std::string prec_type_str = "";
+  //     ppcv.query("precond_type", prec_type_str);
 
-      auto pt = precond_types.find(prec_type_str);
-      if (pt != precond_types.end()) {
-        udata->precond_type = pt->second.identifier;
-      } else {
-        std::string abort_message = "Wrong precond_type. Options are:\n";
-        for (const auto& precond_type : precond_types) {
-          abort_message.append("  ");
-          abort_message.append(precond_type.first);
-          abort_message.append("\n");
-        }
-        amrex::Abort(abort_message);
-      }
-    }
-  } else {
-    std::string abort_message = "Wrong solve_type. Options are:\n";
-    for (const auto& solver_type : available_solver_types) {
-      abort_message.append("  ");
-      abort_message.append(solver_type.first);
-      abort_message.append("\n");
-    }
-    amrex::Abort(abort_message);
-  }
+  //     auto pt = precond_types.find(prec_type_str);
+  //     if (pt != precond_types.end()) {
+  //       udata->precond_type = pt->second.identifier;
+  //     } else {
+  //       std::string abort_message = "Wrong precond_type. Options are:\n";
+  //       for (const auto& precond_type : precond_types) {
+  //         abort_message.append("  ");
+  //         abort_message.append(precond_type.first);
+  //         abort_message.append("\n");
+  //       }
+  //       amrex::Abort(abort_message);
+  //     }
+  //   }
+  // } else {
+  //   std::string abort_message = "Wrong solve_type. Options are:\n";
+  //   for (const auto& solver_type : available_solver_types) {
+  //     abort_message.append("  ");
+  //     abort_message.append(solver_type.first);
+  //     abort_message.append("\n");
+  //   }
+  //   amrex::Abort(abort_message);
+  // }
 
   // Pass options to udata
   const int HP =
@@ -1455,7 +1464,6 @@ ReactorCvode::react(
     LS = SUNLinSol_MagmaDense(y, A, *amrex::sundials::The_Sundials_Context());
     if (utils::check_flag(static_cast<void*>(LS), "SUNLinSol_MagmaDense", 0))
       return (1);
-    amrex::Print() << "     Using MAGMA batched dense linear solver\n";
     flag = CVodeSetLinearSolver(cvode_mem, LS, A);
     if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
       return (1);
@@ -1476,14 +1484,11 @@ ReactorCvode::react(
       gko::CudaExecutor::create(0, gko::OmpExecutor::create()),
       gko::DpcppExecutor::create(0, gko::OmpExecutor::create()));
     auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build().on(gko_exec));
-
-    auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<sunrealtype>::build().on(gko_exec));
     auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
-                                               precond_factory, user_data->ncells,
+                                               nullptr, user_data->ncells,
                                                *amrex::sundials::The_Sundials_Context());
-    LSview->setEnableScaling(user_data->scaling);
+    LSview->setEnableScaling(linear_solver_scaling);
     LS = LSview->get();
-    amrex::Print() << "     Using Ginkgo GMRES linear solver\n";
     flag = CVodeSetLinearSolver(cvode_mem, LS, A);
     if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
       return (1);
@@ -1502,35 +1507,9 @@ ReactorCvode::react(
     using SUNMatrixType           = sundials::ginkgo::BlockMatrix<GkoBatchMatrixType>;
     using GkoSolverType           = gko::solver::BatchBicgstab<sunrealtype>;
     using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
-    auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<sunrealtype>::build().on(gko_exec));
+    // auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<sunrealtype>::build().on(gko_exec));
     auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
-                                               precond_factory, user_data->ncells,
-                                               *amrex::sundials::The_Sundials_Context());
-    LSview->setEnableScaling(user_data->scaling);
-    LS = LSview->Convert();
-    flag = CVodeSetLinearSolver(cvode_mem, LS, A);
-    if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
-      return (1);
-    flag = CVodeSetLSNormFactor(cvode_mem, std::sqrt(NUM_SPECIES + 1));
-    if (utils::check_flag(&flag, "CVodeSetLSNormFactor", 1))
-      return (1);
-#else
-    amrex::Abort(
-      "Shoudn't be there. solve_type ginkgo<TYPE> only available with "
-      "PELE_USE_GINKGO = TRUE");
-#endif
-  } else if (user_data->solve_type == cvode::ginkgoBICGSTAB) {
-#ifdef PELE_USE_GINKGO
-    using GkoMatrixType           = gko::matrix::Csr<amrex::Real>;
-    using GkoBatchMatrixType      = gko::matrix::BatchCsr<amrex::Real>;
-    using GkoSolverType           = gko::solver::BatchBicgstab<amrex::Real>;
-    using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
-
-    auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build().on(gko_exec));
-    precond_factory = nullptr;
-
-    auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
-                                               precond_factory, user_data->ncells,
+                                               nullptr, user_data->ncells,
                                                *amrex::sundials::The_Sundials_Context());
     LSview->setEnableScaling(user_data->scaling);
     LS = LSview->Convert();
@@ -1595,19 +1574,9 @@ ReactorCvode::react(
       return (1);
   }
 
-  // CVODE runtime options
-  flag = CVodeSetMaxNonlinIters(cvode_mem, max_nls_iters);
-  if (utils::check_flag(&flag, "CVodeSetMaxNonlinIters", 1))
+  flag = setCvodeOptions(cvode_mem, LS != nullptr);
+  if (utils::check_flag(&flag, "setCvodeOptions", 1))
     return (1);
-  flag = CVodeSetMaxNumSteps(cvode_mem, 100000);
-  if (utils::check_flag(&flag, "CVodeSetMaxNumSteps", 1))
-    return (1);
-  flag = CVodeSetMaxOrd(cvode_mem, user_data->maxOrder);
-  if (utils::check_flag(&flag, "CVodeSetMaxOrd", 1))
-    return (1);
-  flag = CVodeSetEpsLin(cvode_mem, epslin);
-  if (utils::check_flag(&flag, "CVodeSetEpsLin", 1))
-      return (1);
 
   // Actual CVODE solve
   BL_PROFILE_VAR("Pele::ReactorCvode::react():CVode", AroundCVODE);
@@ -1957,19 +1926,9 @@ ReactorCvode::react(
       return (1);
   }
 
-  // CVODE runtime options
-  flag = CVodeSetMaxNonlinIters(cvode_mem, max_nls_iters);
-  if (utils::check_flag(&flag, "CVodeSetMaxNonlinIters", 1))
+  flag = setCvodeOptions(cvode_mem, LS != nullptr);
+  if (utils::check_flag(&flag, "setCvodeOptions", 1))
     return (1);
-  flag = CVodeSetMaxNumSteps(cvode_mem, 100000);
-  if (utils::check_flag(&flag, "CVodeSetMaxNumSteps", 1))
-    return (1);
-  flag = CVodeSetMaxOrd(cvode_mem, user_data->maxOrder);
-  if (utils::check_flag(&flag, "CVodeSetMaxOrd", 1))
-    return (1);
-  flag = CVodeSetEpsLin(cvode_mem, epslin);
-  if (utils::check_flag(&flag, "CVodeSetEpsLin", 1))
-      return (1);
 
   // Actual CVODE solve
   BL_PROFILE_VAR("Pele::ReactorCvode::react():CVode", AroundCVODE);
