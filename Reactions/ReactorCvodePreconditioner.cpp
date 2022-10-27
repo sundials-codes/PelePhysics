@@ -15,7 +15,7 @@ Precond(
 {
   BL_PROFILE("Pele::ReactorCvode::Precond()");
 
-  amrex::Real* u_d = N_VGetDeviceArrayPointer_Cuda(u);
+  amrex::Real* u_d = N_VGetDeviceArrayPointer(u);
 
   CVODEUserData* udata = static_cast<CVODEUserData*>(user_data);
   udata->gamma = gamma;
@@ -108,8 +108,8 @@ PSolve(
   auto csr_col_index_d = udata->csr_col_index_d;
   auto NNZ = udata->NNZ;
 
-  amrex::Real* z_d = N_VGetDeviceArrayPointer_Cuda(z);
-  amrex::Real* r_d = N_VGetDeviceArrayPointer_Cuda(r);
+  amrex::Real* z_d = N_VGetDeviceArrayPointer(z);
+  amrex::Real* r_d = N_VGetDeviceArrayPointer(r);
 
   cusolverStatus_t cuS_st = CUSOLVER_STATUS_SUCCESS;
   cuS_st = cusolverSpDcsrqrsvBatched(
@@ -121,8 +121,8 @@ PSolve(
   cudaError_t cuda_status = cudaDeviceSynchronize();
   AMREX_ASSERT(cuda_status == cudaSuccess);
 
-  N_VCopyFromDevice_Cuda(z);
-  N_VCopyFromDevice_Cuda(r);
+  utils::copyNVectorFromDevice(z);
+  utils::copyNVectorFromDevice(r);
 
   return (0);
 }

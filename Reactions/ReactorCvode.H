@@ -33,6 +33,11 @@
 #include <sunlinsol/sunlinsol_magmadense.h>
 #endif
 
+#ifdef PELE_USE_GINKGO
+#include <sunmatrix/sunmatrix_ginkgoblock.hpp>
+#include <sunlinsol/sunlinsol_ginkgoblock.hpp>
+#endif
+
 #ifdef AMREX_USE_CUDA
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
@@ -149,6 +154,7 @@ private:
 
   amrex::Real relTol{1e-6};
   amrex::Real absTol{1e-10};
+  amrex::Real epslin{0.0};
   utils::FlattenOps<Ordering> flatten_ops;
   int m_reactor_type{0};
 #if defined(AMREX_USE_HIP)
@@ -156,10 +162,9 @@ private:
 #else
   int atomic_reductions{1};
 #endif
+  bool m_clean_init_massfrac{false};
   int max_nls_iters{3};
   int max_fp_accel{2};
-  int m_print_profiling{0};
-  bool m_clean_init_massfrac{false};
 
 #ifndef AMREX_USE_GPU
   N_Vector y = nullptr;

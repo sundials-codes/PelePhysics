@@ -29,6 +29,10 @@
 #include <sunmatrix/sunmatrix_magmadense.h>
 #include <sunlinsol/sunlinsol_magmadense.h>
 #endif
+#ifdef PELE_USE_GINKGO
+#include <sunmatrix/sunmatrix_ginkgoblock.hpp>
+#include <sunlinsol/sunlinsol_ginkgoblock.hpp>
+#endif
 #endif
 
 namespace pele::physics::reactions::cvode {

@@ -92,6 +92,11 @@ public:
 
 protected:
   int verbose{0};
+#if defined(AMREX_USE_HIP)
+  int atomic_reductions{0};
+#else
+  int atomic_reductions{1};
+#endif
   amrex::Array<amrex::Real, NUM_SPECIES + 1> m_typ_vals = {0.0};
 };
 } // namespace pele::physics::reactions

@@ -9,7 +9,7 @@ else
 endif
 configSpecificTPSuffix=$(shell cd $(PELE_PHYSICS_HOME)/ThirdParty; $(MAKE) tp_suffix AMREX_HOME=$(AMREX_HOME) USE_CUDA=$(USE_CUDA) USE_HIP=$(USE_HIP) USE_SYCL=$(USE_SYCL) PELE_USE_KLU=$(PELE_USE_KLU) PELE_USE_MAGMA=$(PELE_USE_MAGMA) PRECISION=$(PRECISION) DEBUG=$(DEBUG) COMP=$(COMP) NVCC=$(COMP) | tail -1)
 REL_SUNDIALS_LIB_DIR := $(PELE_PHYSICS_HOME)/ThirdParty/INSTALL/$(configSpecificTPSuffix)/lib
-SUNDIALS_LIB_DIR := $(abspath $(lastword $(REL_SUNDIALS_LIB_DIR)))
+SUNDIALS_LIB_DIR ?= $(abspath $(lastword $(REL_SUNDIALS_LIB_DIR)))
 INCLUDE_LOCATIONS += $(SUNDIALS_LIB_DIR)/../include
 LIBRARIES += -L$(SUNDIALS_LIB_DIR) -lsundials_cvode -lsundials_arkode
 LIBRARIES += -L$(SUNDIALS_LIB_DIR) -lsundials_nvecserial
@@ -55,5 +55,20 @@ ifeq ($(PELE_USE_MAGMA), TRUE)
   INCLUDE_LOCATIONS += $(MAGMA_DIR)/include
   ifneq ($(shell uname),Darwin)
     LIBRARIES += -Wl,-rpath=${MAGMA_DIR}/lib
+  endif
+endif
+ifeq ($(PELE_USE_GINKGO), TRUE)
+  ifeq ($(USE_CUDA),FALSE)
+    ifeq ($(USE_HIP),FALSE)
+      $(error PELE_USE_GINKGO only available when using HIP or CUDA)
+    endif
+  endif
+  DEFINES    += -DPELE_USE_GINKGO
+  GINKGO_DIR ?= $(PELE_PHYSICS_HOME)/ThirdParty/INSTALL/$(configSpecificTPSuffix)
+  GINKGO_LIBRARY ?= ginkgo
+  LIBRARIES  += -L$(GINKGO_DIR)/lib -l$(GINKGO_LIBRARY) -lginkgo_device -lginkgo_omp -lginkgo_cuda -lginkgo_reference -lginkgo_hip -lginkgo_dpcpp
+  INCLUDE_LOCATIONS += $(GINKGO_DIR)/include
+  ifneq ($(shell uname),Darwin)
+    LIBRARIES += -Wl,-rpath=$(GINKGO_DIR)/lib
   endif
 endif

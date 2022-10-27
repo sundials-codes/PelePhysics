@@ -1,8 +1,123 @@
 #include "ReactorCvode.H"
-
 #include <iostream>
+#include <unordered_map>
 
 namespace pele::physics::reactions {
+
+namespace {
+
+#ifdef PELE_USE_GINKGO
+const auto gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
+  gko::HipExecutor::create(0, gko::OmpExecutor::create()),
+  gko::CudaExecutor::create(0, gko::OmpExecutor::create()),
+  gko::DpcppExecutor::create(0, gko::OmpExecutor::create()));
+#endif
+
+using utils::PrecondDescriptor;
+using utils::SolverDescriptor;
+
+#ifdef AMREX_USE_GPU
+PrecondDescriptor sparseSimpleAJacPrecondGPU{
+  cvode::sparseSimpleAJac, "cuSPARSE simplified AJ-based preconditioner"};
+#else
+PrecondDescriptor customSimpleAJacPrecond{
+  cvode::customSimpleAJac, "custom AJ-based preconditioner"};
+PrecondDescriptor sparseSimpleAJacPrecondCPU{
+  cvode::sparseSimpleAJac, "sparse simplified AJ-based preconditioner"};
+PrecondDescriptor denseSimpleAJacPrecond{
+  cvode::denseSimpleAJac, "dense simplified AJ-based preconditioner"};
+#endif
+
+constexpr const int analytical_jacobian_no = 0;
+constexpr const int analytical_jacobian_yes = 1;
+
+const std::unordered_map<std::string, SolverDescriptor> available_solver_types
+{
+  // available for CPUs or GPUs
+  {"fixed_point",
+   SolverDescriptor{
+     cvode::fixedPoint,
+     analytical_jacobian_no,
+     {},
+     "fixed-point nonlinear solver"}},
+    {"GMRES",
+     SolverDescriptor{
+       cvode::GMRES, analytical_jacobian_no, {}, "JFNK GMRES linear solver"}},
+#ifdef AMREX_USE_GPU
+// available with GPUs only
+#ifdef PELE_USE_MAGMA
+    {"magma_direct",
+     SolverDescriptor{
+       cvode::magmaDirect,
+       analytical_jacobian_yes,
+       {},
+       "MAGMA batched LU direct linear solver with analytical Jacobian"}},
+#endif
+#ifdef PELE_USE_GINKGO
+    {"ginkgo_GMRES",
+     SolverDescriptor{
+       cvode::ginkgoGMRES,
+       analytical_jacobian_yes,
+       {},
+       "Ginkgo batched GMRES linear solver with analytical Jacobian"}},
+    {"ginkgo_BICGSTAB",
+     SolverDescriptor{
+       cvode::ginkgoBICGSTAB,
+       analytical_jacobian_yes,
+       {},
+       "Ginkgo batched BiCGSTAB linear solver with analytical Jacobian"}},
+#endif
+    {"sparse_direct",
+     SolverDescriptor{
+       cvode::sparseDirect,
+       analytical_jacobian_yes,
+       {},
+       "cuSPARSE batched sparse QR linear solver with analytical Jacobian"}},
+    {"precGMRES",
+     SolverDescriptor{
+       cvode::precGMRES, analytical_jacobian_no,
+       std::unordered_map<std::string, PrecondDescriptor>{
+         {"cuSparse_simplified_AJacobian", sparseSimpleAJacPrecondGPU}},
+       "JFNK GMRES linear solver"}},
+#else /*AMREX_USE_GPU*/
+    // available with CPUs only
+    {"dense_direct",
+     SolverDescriptor{
+       cvode::denseFDDirect,
+       analytical_jacobian_no,
+       {},
+       "dense direct linear solver with finite-difference Jacobian"}},
+    {"denseAJ_direct",
+     SolverDescriptor{
+       cvode::denseDirect,
+       analytical_jacobian_yes,
+       {},
+       "dense direct linear solver with analytical Jacobian"}},
+#ifdef PELE_USE_KLU
+    {"sparse_direct",
+     SolverDescriptor{
+       cvode::sparseDirect,
+       analytical_jacobian_yes,
+       {},
+       "KLU sparse direct linear solver with analytical Jacobian"}},
+#endif
+    {"custom_direct",
+     SolverDescriptor{
+       cvode::customDirect,
+       analytical_jacobian_yes,
+       {},
+       "custom direct linear solver with analytical Jacobian"}},
+    {"precGMRES",
+     SolverDescriptor{
+       cvode::precGMRES, analytical_jacobian_no,
+       std::unordered_map<std::string, PrecondDescriptor>{
+         {"custom_simplified_AJacobian", customSimpleAJacPrecond},
+         {"dense_simplified_AJacobian", denseSimpleAJacPrecond},
+         {"sparse_simplified_AJacobian", sparseSimpleAJacPrecondCPU},
+         "JFNK GMRES linear solver"}}
+#endif /*AMREX_USE_GPU*/
+};
+} // namespace
 
 int
 ReactorCvode::init(int reactor_type, int ncells)
@@ -14,11 +129,13 @@ ReactorCvode::init(int reactor_type, int ncells)
   pp.query("verbose", verbose);
   pp.query("rtol", relTol);
   pp.query("atol", absTol);
-  pp.query("atomic_reductions", atomic_reductions);
+  pp.query("atomic_reductions", atomic_reductions); // TODO: is this the right place, or should it be in the cvode pp namespace?
   pp.query("max_nls_iters", max_nls_iters);
   pp.query("max_fp_accel", max_fp_accel);
   pp.query("clean_init_massfrac", m_clean_init_massfrac);
-  pp.query("print_profiling", m_print_profiling);
+  pp.query("max_nls_iters", max_nls_iters); // TODO: is this the right place, or should it be in the cvode pp namespace?
+  pp.query("max_fp_accel", max_fp_accel); // TODO: is this the right place, or should it be in the cvode pp namespace?
+  pp.query("epslin", epslin); // TODO: is this the right place, or should it be in the cvode pp namespace?
   checkCvodeOptions();
 
   amrex::Print() << "Initializing CVODE:\n";
@@ -287,6 +404,10 @@ ReactorCvode::init(int reactor_type, int ncells)
       return (1);
     }
   }
+  flag = CVodeSetEpsLin(cvode_mem, epslin); // linear solver tolerance factor
+  if (utils::check_flag(&flag, "CVodeSetEpsLin", 1) != 0) {
+    return (1);
+  }
 
   // End of CPU section
 #endif
@@ -308,152 +429,50 @@ ReactorCvode::checkCvodeOptions() const
   int analytical_jacobian = 0;
   int precond_type = -1;
 
-#ifdef AMREX_USE_GPU
-  if (solve_type_str == "fixed_point") {
-    solve_type = cvode::fixedPoint;
-    analytical_jacobian = 0;
-    if (verbose > 0)
-      amrex::Print() << " Using a fixed-point nonlinear solver\n";
-  } else if (solve_type_str == "sparse_direct") {
-    solve_type = cvode::sparseDirect;
-    analytical_jacobian = 1;
-#ifdef AMREX_USE_CUDA
-    if (verbose > 0)
-      amrex::Print()
-        << " Using a cuSparse direct linear solve with analytical Jacobian\n";
-#else
-    amrex::Abort("solve_type 'sparse_direct' only available with CUDA");
-#endif
-  } else if (solve_type_str == "custom_direct") {
-    solve_type = cvode::customDirect;
-    analytical_jacobian = 1;
-#ifdef AMREX_USE_CUDA
-    if (verbose > 0)
-      amrex::Print()
-        << " Using a custom direct linear solve with analytical Jacobian\n";
-#else
-    amrex::Abort("solve_type 'custom_direct' only available with CUDA");
-#endif
-  } else if (solve_type_str == "magma_direct") {
-    solve_type = cvode::magmaDirect;
-    analytical_jacobian = 1;
-#ifdef PELE_USE_MAGMA
-    if (verbose > 0)
-      amrex::Print() << " Using MAGMA direct linear solve\n";
-#else
-    amrex::Abort(
-      "solve_type 'magma_direct' only available with if PELE_USE_MAGMA true");
-#endif
-  } else if (solve_type_str == "GMRES") {
-    solve_type = cvode::GMRES;
-    if (verbose > 0)
-      amrex::Print() << " Using a JFNK GMRES linear solve\n";
-  } else if (solve_type_str == "precGMRES") {
-    solve_type = cvode::precGMRES;
-    if (verbose > 0)
-      amrex::Print() << " Using a JFNK GMRES linear solve";
-    std::string prec_type_str = "cuSparse_simplified_AJacobian";
-    ppcv.query("precond_type", prec_type_str);
-    if (prec_type_str == "cuSparse_simplified_AJacobian") {
-      precond_type = cvode::sparseSimpleAJac;
-#ifdef AMREX_USE_CUDA
-      amrex::Print() << " with a cuSparse simplified AJ-based preconditioner";
-#else
-      amrex::Abort(
-        "precond_type 'cuSparse_simplified_AJacobian' only available with "
-        "CUDA");
-#endif
-    } else {
-      amrex::Abort(
-        "Wrong precond_type. Only option is: 'cuSparse_simplified_AJacobian'");
-    }
-    amrex::Print() << "\n";
-  } else {
-    amrex::Abort(
-      "Wrong solve_type. Options are: 'sparse_direct', 'custom_direct', "
-      "'GMRES', 'precGMRES', 'fixed_point'");
-  }
+  auto st = available_solver_types.find(solve_type_str);
+  if (st != available_solver_types.end()) {
+    solve_type = st->second.identifier;
+    analytical_jacobian = st->second.analytical_jacobian;
 
-#else
-  if (solve_type_str == "fixed_point") {
-    solve_type = cvode::fixedPoint;
-    analytical_jacobian = 0;
-    if (verbose > 0) {
-      amrex::Print() << " Using a fixed-point nonlinear solver\n";
+    if (verbose > 0)
+      amrex::Print() << " Using a " << st->second.text_description << "\n";
+
+    auto precond_types = st->second.precond_types;
+    if (precond_types.size() > 0) {
+      std::string prec_type_str = "";
+      ppcv.query("precond_type", prec_type_str);
+
+      auto pt = precond_types.find(prec_type_str);
+      if (pt != precond_types.end()) {
+        precond_type = pt->second.identifier;
+      } else {
+        std::string abort_message = "Wrong precond_type. Options are:\n";
+        for (const auto& precond_type : precond_types) {
+          abort_message.append("  ");
+          abort_message.append(precond_type.first);
+          abort_message.append("\n");
+        }
+        amrex::Abort(abort_message);
+      }
+
+      if (verbose > 0)
+        amrex::Print() << " with a " << pt->second.text_description << "\n";
     }
-  } else if (solve_type_str == "dense_direct") {
-    solve_type = cvode::denseFDDirect;
-    if (verbose > 0) {
-      amrex::Print()
-        << " Using a dense direct linear solve with Finite Difference "
-           "Jacobian\n";
-    }
-  } else if (solve_type_str == "denseAJ_direct") {
-    solve_type = cvode::denseDirect;
-    analytical_jacobian = 1;
-    if (verbose > 0) {
-      amrex::Print()
-        << " Using a dense direct linear solve with Analytical Jacobian\n";
-    }
-  } else if (solve_type_str == "sparse_direct") {
-    solve_type = cvode::sparseDirect;
-    analytical_jacobian = 1;
-#ifndef PELE_USE_KLU
-    amrex::Abort("solver_type sparse_direct requires the KLU library");
-#endif
-    if (verbose > 0) {
-      amrex::Print()
-        << " Using a sparse direct linear solve with KLU Analytical Jacobian\n";
-    }
-  } else if (solve_type_str == "custom_direct") {
-    solve_type = cvode::customDirect;
-    analytical_jacobian = 1;
-    if (verbose > 0) {
-      amrex::Print()
-        << " Using a sparse custom direct linear solve with Analytical "
-           "Jacobian\n";
-    }
-  } else if (solve_type_str == "GMRES") {
-    solve_type = cvode::GMRES;
-    if (verbose > 0) {
-      amrex::Print() << " Using a JFNK GMRES linear solve\n";
-    }
-  } else if (solve_type_str == "precGMRES") {
-    solve_type = cvode::precGMRES;
-    if (verbose > 0) {
-      amrex::Print() << " Using a JFNK GMRES linear solve";
-    }
-    std::string prec_type_str = "none";
-    ppcv.query("precond_type", prec_type_str);
-    if (prec_type_str == "dense_simplified_AJacobian") {
-      precond_type = cvode::denseSimpleAJac;
-      amrex::Print() << " with a dense simplified AJ-based preconditioner";
-    } else if (prec_type_str == "sparse_simplified_AJacobian") {
-      precond_type = cvode::sparseSimpleAJac;
-#ifndef PELE_USE_KLU
-      amrex::Abort(
-        "precond_type sparse_simplified_AJacobian requires the KLU library");
-#endif
-      amrex::Print() << " with a sparse simplified AJ-based preconditioner";
-    } else if (prec_type_str == "custom_simplified_AJacobian") {
-      precond_type = cvode::customSimpleAJac;
-      amrex::Print() << " with a custom simplified AJ-based preconditioner";
-    } else {
-      amrex::Abort(
-        "Wrong precond_type. Options are: 'dense_simplified_AJacobian', "
-        "'sparse_simplified_AJacobian', 'custom_simplified_AJacobian'");
-    }
-    amrex::Print() << "\n";
+#ifndef AMREX_USE_GPU
   } else if (solve_type_str == "diagnostic") {
     solve_type = cvode::hackDumpSparsePattern;
-  } else {
-    amrex::Abort(
-      "Wrong solve_type. Options are: 'dense_direct', denseAJ_direct', "
-      "'sparse_direct', 'custom_direct', 'GMRES', 'precGMRES', 'fixed_point'");
-  }
 #endif
+  } else {
+    std::string abort_message = "Wrong solve_type. Options are:\n";
+    for (const auto& solver_type : available_solver_types) {
+      abort_message.append("  ");
+      abort_message.append(solver_type.first);
+      abort_message.append("\n");
+    }
+    amrex::Abort(abort_message);
+  }
 
-  // Print additionnal information
+  // Print additional information
   if (precond_type == cvode::sparseSimpleAJac) {
     int nJdata = 0;
     const int HP =
@@ -724,6 +743,8 @@ ReactorCvode::allocUserData(
   amrex::ParmParse ppcv("cvode");
   udata->maxOrder = 2;
   ppcv.query("max_order", udata->maxOrder);
+  udata->scaling = true;
+  ppcv.query("scaling", udata->scaling);
   ppcv.query("solve_type", solve_type_str);
 
   // Defaults
@@ -731,84 +752,39 @@ ReactorCvode::allocUserData(
   udata->analytical_jacobian = 0;
   udata->precond_type = -1;
 
-#ifdef AMREX_USE_GPU
-  if (solve_type_str == "fixed_point") {
-    udata->solve_type = cvode::fixedPoint;
-    udata->analytical_jacobian = 0;
-  } else if (solve_type_str == "sparse_direct") {
-    udata->solve_type = cvode::sparseDirect;
-    udata->analytical_jacobian = 1;
-  } else if (solve_type_str == "custom_direct") {
-    udata->solve_type = cvode::customDirect;
-    udata->analytical_jacobian = 1;
-  } else if (solve_type_str == "magma_direct") {
-    udata->solve_type = cvode::magmaDirect;
-    udata->analytical_jacobian = 1;
-  } else if (solve_type_str == "GMRES") {
-    udata->solve_type = cvode::GMRES;
-  } else if (solve_type_str == "precGMRES") {
-    udata->solve_type = cvode::precGMRES;
-    std::string prec_type_str = "cuSparse_simplified_AJacobian";
-    ppcv.query("precond_type", prec_type_str);
-    if (prec_type_str == "cuSparse_simplified_AJacobian") {
-      udata->precond_type = cvode::sparseSimpleAJac;
-    } else {
-      amrex::Abort(
-        "Wrong precond_type. Only option is: 'cuSparse_simplified_AJacobian'");
-    }
-    amrex::Print() << "\n";
-  } else {
-    amrex::Abort(
-      "Wrong solve_type. Options are: 'sparse_direct', 'custom_direct', "
-      "'GMRES', 'precGMRES', 'fixed_point'");
-  }
+  // Check for valid solve_type and precond_type, and set
+  // udata->solve_type, udata->analytical_jacobian, udata->precond_type.
+  auto st = available_solver_types.find(solve_type_str);
+  if (st != available_solver_types.end()) {
+    udata->solve_type = st->second.identifier;
+    udata->analytical_jacobian = st->second.analytical_jacobian;
+    auto precond_types = st->second.precond_types;
+    if (precond_types.size() > 0) {
+      std::string prec_type_str = "";
+      ppcv.query("precond_type", prec_type_str);
 
-#else
-  if (solve_type_str == "fixed_point") {
-    udata->solve_type = cvode::fixedPoint;
-    udata->analytical_jacobian = 0;
-  } else if (solve_type_str == "dense_direct") {
-    udata->solve_type = cvode::denseFDDirect;
-  } else if (solve_type_str == "denseAJ_direct") {
-    udata->solve_type = cvode::denseDirect;
-    udata->analytical_jacobian = 1;
-  } else if (solve_type_str == "sparse_direct") {
-    udata->solve_type = cvode::sparseDirect;
-    udata->analytical_jacobian = 1;
-#ifndef PELE_USE_KLU
-    amrex::Abort("solver_type sparse_direct requires the KLU library");
-#endif
-  } else if (solve_type_str == "custom_direct") {
-    udata->solve_type = cvode::customDirect;
-    udata->analytical_jacobian = 1;
-  } else if (solve_type_str == "GMRES") {
-    udata->solve_type = cvode::GMRES;
-  } else if (solve_type_str == "precGMRES") {
-    udata->solve_type = cvode::precGMRES;
-    std::string prec_type_str = "sparse_simplified_AJacobian";
-    ppcv.query("precond_type", prec_type_str);
-    if (prec_type_str == "dense_simplified_AJacobian") {
-      udata->precond_type = cvode::denseSimpleAJac;
-    } else if (prec_type_str == "sparse_simplified_AJacobian") {
-      udata->precond_type = cvode::sparseSimpleAJac;
-#ifndef PELE_USE_KLU
-      amrex::Abort(
-        "precond_type sparse_simplified_AJacobian requires the KLU library");
-#endif
-    } else if (prec_type_str == "custom_simplified_AJacobian") {
-      udata->precond_type = cvode::customSimpleAJac;
-    } else {
-      amrex::Abort(
-        "Wrong precond_type. Options are: 'dense_simplified_AJacobian', "
-        "'sparse_simplified_AJacobian', 'custom_simplified_AJacobian'");
+      auto pt = precond_types.find(prec_type_str);
+      if (pt != precond_types.end()) {
+        udata->precond_type = pt->second.identifier;
+      } else {
+        std::string abort_message = "Wrong precond_type. Options are:\n";
+        for (const auto& precond_type : precond_types) {
+          abort_message.append("  ");
+          abort_message.append(precond_type.first);
+          abort_message.append("\n");
+        }
+        amrex::Abort(abort_message);
+      }
     }
-    amrex::Print() << "\n";
   } else {
-    amrex::Abort(
-      "Wrong solve_type. Options are: 'dense_direct', denseAJ_direct', "
-      "'sparse_direct', 'custom_direct', 'GMRES', 'precGMRES', 'fixed_point'");
+    std::string abort_message = "Wrong solve_type. Options are:\n";
+    for (const auto& solver_type : available_solver_types) {
+      abort_message.append("  ");
+      abort_message.append(solver_type.first);
+      abort_message.append("\n");
+    }
+    amrex::Abort(abort_message);
   }
-#endif
 
   // Pass options to udata
   const int HP =
@@ -839,7 +815,7 @@ ReactorCvode::allocUserData(
   udata->FirstTimePrecond = true;
 #endif
 
-  // Alloc internal udata Analytical Jacobian containers
+// Alloc internal udata Analytical Jacobian containers
 #ifdef AMREX_USE_GPU
   if (udata->solve_type == cvode::sparseDirect) {
 #ifdef AMREX_USE_CUDA
@@ -919,7 +895,44 @@ ReactorCvode::allocUserData(
       *amrex::sundials::The_SUNMemory_Helper(), nullptr,
       *amrex::sundials::The_Sundials_Context());
 #else
-    amrex::Abort("Solver_type magma_direct reauires PELE_USE_MAGMA = TRUE");
+    amrex::Abort("Solver_type magma_direct requires PELE_USE_MAGMA = TRUE");
+#endif
+  } else if (
+    udata->solve_type == cvode::ginkgoGMRES ||
+    udata->solve_type == cvode::ginkgoBICGSTAB) {
+#ifdef PELE_USE_GINKGO
+    using GkoBatchMatrixType = gko::matrix::BatchCsr<amrex::Real>;
+
+    SPARSITY_INFO_SYST(&(udata->NNZ), &HP, 1);
+
+    udata->csr_jac_d = (amrex::Real*)amrex::The_Arena()->alloc(
+      udata->NNZ * a_ncells * sizeof(amrex::Real));
+    udata->csr_row_count_h =
+      (int*)amrex::The_Pinned_Arena()->alloc((NUM_SPECIES + 2) * sizeof(int));
+    udata->csr_col_index_h =
+      (int*)amrex::The_Pinned_Arena()->alloc(udata->NNZ * sizeof(int));
+
+    SPARSITY_PREPROC_SYST_CSR(
+      udata->csr_col_index_h, udata->csr_row_count_h, &HP, 1, 0);
+
+    auto batch_mat_size = gko::batch_dim<2>(
+      a_ncells, gko::dim<2>(NUM_SPECIES + 1, NUM_SPECIES + 1));
+    auto values_view = gko::Array<amrex::Real>::view(
+      gko_exec, a_ncells * udata->NNZ, udata->csr_jac_d);
+    auto rowptrs_view = gko::Array<int>::view(
+      gko_exec, NUM_SPECIES + 2, udata->csr_row_count_h);
+    auto colidxs_view = gko::Array<int>::view(
+      gko_exec, udata->NNZ, udata->csr_col_index_h);
+    auto gko_batch_matrix = gko::share(GkoBatchMatrixType::create(
+      gko_exec, batch_mat_size, std::move(values_view), std::move(colidxs_view),
+      std::move(rowptrs_view)));
+
+    auto sun_batch_mat = new sundials::ginkgo::BlockMatrix<GkoBatchMatrixType>(
+      gko_batch_matrix, *amrex::sundials::The_Sundials_Context());
+    a_A = sun_batch_mat->get();
+#else
+    amrex::Abort(
+      "Solver_type cvode::ginkgo<TYPE> requires PELE_USE_GINKGO = TRUE");
 #endif
   }
 
@@ -964,7 +977,7 @@ ReactorCvode::allocUserData(
   }
 #endif
 
-  // Alloc internal udata Preconditioner containers
+// Alloc internal udata Preconditioner containers
 #ifdef AMREX_USE_GPU
   if (udata->precond_type == cvode::sparseSimpleAJac) {
 #ifdef AMREX_USE_CUDA
@@ -1124,7 +1137,7 @@ ReactorCvode::allocUserData(
     }
   }
 #endif
-}
+} // namespace
 
 int
 ReactorCvode::react(
@@ -1264,6 +1277,60 @@ ReactorCvode::react(
       "Shoudn't be there. solve_type magma_direct only available with "
       "PELE_USE_MAGMA = TRUE");
 #endif
+  } else if (user_data->solve_type == cvode::ginkgoGMRES) {
+#ifdef PELE_USE_GINKGO
+    using GkoMatrixType           = gko::matrix::Csr<sunrealtype>;
+    using GkoBatchMatrixType      = gko::matrix::BatchCsr<sunrealtype>;
+    using SUNMatrixType           = sundials::ginkgo::BlockMatrix<GkoBatchMatrixType>;
+    using GkoSolverType           = gko::solver::BatchGmres<sunrealtype>;
+    using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, SUNMatrixType>;
+
+    auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<sunrealtype>::build().on(gko_exec));
+    precond_factory = nullptr;
+
+    auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
+                                               precond_factory, user_data->ncells,
+                                               *amrex::sundials::The_Sundials_Context());
+    LSview->setEnableScaling(user_data->scaling);
+    LS = LSview->get();
+    flag = CVodeSetLinearSolver(cvode_mem, LS, A);
+    if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
+      return (1);
+    flag = CVodeSetLSNormFactor(cvode_mem, std::sqrt(NUM_SPECIES + 1));
+    if (utils::check_flag(&flag, "CVodeSetLSNormFactor", 1))
+      return (1);
+#else
+    amrex::Abort(
+      "Shoudn't be there. solve_type ginkgo<TYPE> only available with "
+      "PELE_USE_GINKGO = TRUE");
+#endif
+  } else if (user_data->solve_type == cvode::ginkgoBICGSTAB) {
+#ifdef PELE_USE_GINKGO
+    using GkoMatrixType           = gko::matrix::Csr<sunrealtype>;
+    using GkoBatchMatrixType      = gko::matrix::BatchCsr<sunrealtype>;
+    using SUNMatrixType           = sundials::ginkgo::BlockMatrix<GkoBatchMatrixType>;
+    using GkoSolverType           = gko::solver::BatchBicgstab<sunrealtype>;
+    using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, SUNMatrixType>;
+
+    auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<sunrealtype>::build().on(gko_exec));
+    precond_factory = nullptr;
+
+    auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
+                                               precond_factory, user_data->ncells,
+                                               *amrex::sundials::The_Sundials_Context());
+    LSview->setEnableScaling(user_data->scaling);
+    LS = LSview->get();
+    flag = CVodeSetLinearSolver(cvode_mem, LS, A);
+    if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
+      return (1);
+    flag = CVodeSetLSNormFactor(cvode_mem, std::sqrt(NUM_SPECIES + 1));
+    if (utils::check_flag(&flag, "CVodeSetLSNormFactor", 1))
+      return (1);
+#else
+    amrex::Abort(
+      "Shoudn't be there. solve_type ginkgo<TYPE> only available with "
+      "PELE_USE_GINKGO = TRUE");
+#endif
   } else if (user_data->solve_type == cvode::GMRES) {
     LS = SUNLinSol_SPGMR(
       y, SUN_PREC_NONE, 0, *amrex::sundials::The_Sundials_Context());
@@ -1313,6 +1380,9 @@ ReactorCvode::react(
   flag = CVodeSetMaxOrd(cvode_mem, user_data->maxOrder);
   if (utils::check_flag(&flag, "CVodeSetMaxOrd", 1))
     return (1);
+  flag = CVodeSetEpsLin(cvode_mem, epslin);
+  if (utils::check_flag(&flag, "CVodeSetEpsLin", 1))
+      return (1);
 
   // Actual CVODE solve
   BL_PROFILE_VAR("Pele::ReactorCvode::react():CVode", AroundCVODE);
@@ -1590,6 +1660,17 @@ ReactorCvode::react(
       "Shoudn't be there. solve_type magma_direct only available with "
       "PELE_USE_MAGMA = TRUE");
 #endif
+  } else if (
+    user_data->solve_type == cvode::ginkgoGMRES ||
+    user_data->solve_type == cvode::ginkgoBICGSTAB) {
+#ifdef PELE_USE_GINKGO
+    /* Create linear solver */
+    amrex::Abort("Not implemented");
+#else
+    amrex::Abort(
+      "Shoudn't be there. solve_type ginkgo<TYPE> only available with "
+      "PELE_USE_GINKGO = TRUE");
+#endif
   } else if (user_data->solve_type == cvode::GMRES) {
     LS = SUNLinSol_SPGMR(
       y, SUN_PREC_NONE, 0, *amrex::sundials::The_Sundials_Context());
@@ -1639,6 +1720,9 @@ ReactorCvode::react(
   flag = CVodeSetMaxOrd(cvode_mem, user_data->maxOrder);
   if (utils::check_flag(&flag, "CVodeSetMaxOrd", 1))
     return (1);
+  flag = CVodeSetEpsLin(cvode_mem, epslin);
+  if (utils::check_flag(&flag, "CVodeSetEpsLin", 1))
+      return (1);
 
   // Actual CVODE solve
   BL_PROFILE_VAR("Pele::ReactorCvode::react():CVode", AroundCVODE);

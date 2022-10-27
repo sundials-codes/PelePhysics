@@ -76,6 +76,40 @@ cJac(
       "Calling cJac with solve_type = magma_direct requires PELE_USE_MAGMA = "
       "TRUE !");
 #endif
+  } else if (solveType == ginkgoGMRES || solveType == ginkgoBICGSTAB) {
+#ifdef PELE_USE_GINKGO
+    auto Jgko = static_cast<sundials::ginkgo::BlockMatrix<gko::matrix::BatchCsr<amrex::Real>>*>(J->content)->gkomtx();
+
+    amrex::Real* yvec_d  = N_VGetDeviceArrayPointer(y_in);
+    amrex::Real* Jdata   = Jgko->get_values();
+    int* csr_row_count_d = Jgko->get_row_ptrs();
+    int* csr_col_index_d = Jgko->get_col_idxs();
+
+    // Checks
+    auto Jsize = Jgko->get_size();
+    AMREX_ASSERT(
+      Jsize->stores_equal_sizes() &&
+      (Jsize->get_num_batch_entries()*Jsize->at(0)[0] == (NUM_SPECIES + 1) * ncells) &&
+      (Jsize->get_num_batch_entries()*Jsize->at(0)[1] == (NUM_SPECIES + 1) * ncells) &&
+      (Jsize->get_num_stored_elements() == ncells * NNZ));
+
+    const auto ec = amrex::Gpu::ExecutionConfig(ncells);
+    amrex::launch_global<<<nbBlocks, nbThreads, ec.sharedMem, stream>>>(
+      [=] AMREX_GPU_DEVICE() noexcept {
+        for (int icell = blockDim.x * blockIdx.x + threadIdx.x,
+                 stride = blockDim.x * gridDim.x;
+             icell < ncells; icell += stride) {
+          fKernelComputeAJchem(
+            icell, NNZ, react_type, csr_row_count_d, csr_col_index_d, yvec_d,
+            Jdata);
+        }
+      });
+    amrex::Gpu::Device::streamSynchronize();
+#else
+    amrex::Abort(
+      "Calling cJac with solve_type = ginkgo<TYPE> requires PELE_USE_GINKGO = "
+      "TRUE !");
+#endif
   }
 
   return (0);

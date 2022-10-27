@@ -85,8 +85,8 @@ SUNLinSolSolve_Dense_custom(
 {
   cudaError_t cuda_status = cudaSuccess;
 
-  amrex::Real* x_d = N_VGetDeviceArrayPointer_Cuda(x);
-  amrex::Real* b_d = N_VGetDeviceArrayPointer_Cuda(b);
+  amrex::Real* x_d = N_VGetDeviceArrayPointer(x);
+  amrex::Real* b_d = N_VGetDeviceArrayPointer(b);
 
   amrex::Real* d_data = SUNMatrix_cuSparse_Data(A);
 
