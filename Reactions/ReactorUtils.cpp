@@ -47,12 +47,15 @@ check_flag(void* flagvalue, const char* funcname, int opt)
 
 #ifdef AMREX_USE_GPU
 N_Vector
-setNVectorGPU(int nvsize, int atomic_reductions, amrex::gpuStream_t stream)
+setNVectorGPU(int nvsize, int atomic_reductions, amrex::gpuStream_t stream,
+              SUNContext sunctx)
 {
+  if (sunctx == nullptr) {
+    sunctx = *amrex::sundials::The_Sundials_Context();
+  }
 #if defined(AMREX_USE_CUDA)
   N_Vector y = N_VNewWithMemHelp_Cuda(
-    nvsize, false, *amrex::sundials::The_SUNMemory_Helper(),
-    *amrex::sundials::The_Sundials_Context());
+    nvsize, false, *amrex::sundials::The_SUNMemory_Helper(), sunctx);
   if (check_flag((void*)y, "N_VNewWithMemHelp_Cuda", 0)) {
     amrex::Abort("Unable to create NVector Cuda");
   }
@@ -67,8 +70,7 @@ setNVectorGPU(int nvsize, int atomic_reductions, amrex::gpuStream_t stream)
   N_VSetKernelExecPolicy_Cuda(y, stream_exec_policy, reduce_exec_policy);
 #elif defined(AMREX_USE_HIP)
   N_Vector y = N_VNewWithMemHelp_Hip(
-    nvsize, false, *amrex::sundials::The_SUNMemory_Helper(),
-    *amrex::sundials::The_Sundials_Context());
+    nvsize, false, *amrex::sundials::The_SUNMemory_Helper(), sunctx);
   if (check_flag((void*)y, "N_VNewWithMemHelp_Hip", 0)) {
     amrex::Abort("Unable to create NVector Hip");
   }
@@ -84,8 +86,7 @@ setNVectorGPU(int nvsize, int atomic_reductions, amrex::gpuStream_t stream)
 #elif defined(AMREX_USE_SYCL)
   N_Vector y = N_VNewWithMemHelp_Sycl(
     nvsize, false, *amrex::sundials::The_SUNMemory_Helper(),
-    &amrex::Gpu::Device::streamQueue(),
-    *amrex::sundials::The_Sundials_Context());
+    &amrex::Gpu::Device::streamQueue(), sunctx);
   if (check_flag((void*)y, "N_VNewWithMemHelp_Sycl", 0)) {
     amrex::Abort("Unable to create NVector Sycl");
   }
@@ -99,6 +100,32 @@ setNVectorGPU(int nvsize, int atomic_reductions, amrex::gpuStream_t stream)
 
   delete stream_exec_policy;
   delete reduce_exec_policy;
+}
+
+void copyNVectorToDevice(N_Vector v)
+{
+#if defined(AMREX_USE_CUDA)
+  N_VCopyToDevice_Cuda(v);
+#elif defined(AMREX_USE_HIP)
+  N_VCopyToDevice_Hip(v);
+#elif defined(AMREX_USE_DPCPP)
+  N_VCopyToDevice_Sycl(v);
+#else
+  return;
+#endif
+}
+
+void copyNVectorFromDevice(N_Vector v)
+{
+#if defined(AMREX_USE_CUDA)
+  N_VCopyFromDevice_Cuda(v);
+#elif defined(AMREX_USE_HIP)
+  N_VCopyFromDevice_Hip(v);
+#elif defined(AMREX_USE_DPCPP)
+  N_VCopyFromDevice_Sycl(v);
+#else
+  return;
+#endif
 }
 #endif
 } // namespace pele::physics::reactions::utils

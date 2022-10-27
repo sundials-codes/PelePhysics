@@ -1,6 +1,7 @@
 #ifndef REACTORUTILS_H
 #define REACTORUTILS_H
 
+#include <unordered_map>
 #include <utility>
 #include <AMReX_Gpu.H>
 #include "mechanism.H"
@@ -330,7 +331,10 @@ fKernelSpec(
 
 #ifdef AMREX_USE_GPU
 N_Vector
-setNVectorGPU(int nvsize, int atomic_reduction, amrex::gpuStream_t stream);
+setNVectorGPU(int nvsize, int atomic_reduction, amrex::gpuStream_t stream,
+              SUNContext sunctx = nullptr);
+void copyNVectorToDevice(N_Vector v);
+void copyNVectorFromDevice(N_Vector v);
 #endif
 } // namespace pele::physics::reactions::utils
 #endif
