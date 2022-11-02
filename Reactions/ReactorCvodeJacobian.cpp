@@ -78,7 +78,7 @@ cJac(
 #endif
   } else if (solveType == ginkgoGMRES || solveType == ginkgoBICGSTAB) {
 #ifdef PELE_USE_GINKGO
-    auto Jgko = static_cast<sundials::ginkgo::BlockMatrix<gko::matrix::BatchCsr<amrex::Real>>*>(J->content)->gkomtx();
+    auto Jgko = static_cast<sundials::ginkgo::BlockMatrix<gko::matrix::BatchCsr<amrex::Real>>*>(J->content)->GkoMtx();
 
     amrex::Real* yvec_d  = N_VGetDeviceArrayPointer(y_in);
     amrex::Real* Jdata   = Jgko->get_values();

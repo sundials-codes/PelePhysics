@@ -929,7 +929,7 @@ ReactorCvode::allocUserData(
 
     auto sun_batch_mat = new sundials::ginkgo::BlockMatrix<GkoBatchMatrixType>(
       gko_batch_matrix, *amrex::sundials::The_Sundials_Context());
-    a_A = sun_batch_mat->get();
+    a_A = sun_batch_mat->Convert();
 #else
     amrex::Abort(
       "Solver_type cvode::ginkgo<TYPE> requires PELE_USE_GINKGO = TRUE");
@@ -1279,20 +1279,19 @@ ReactorCvode::react(
 #endif
   } else if (user_data->solve_type == cvode::ginkgoGMRES) {
 #ifdef PELE_USE_GINKGO
-    using GkoMatrixType           = gko::matrix::Csr<sunrealtype>;
-    using GkoBatchMatrixType      = gko::matrix::BatchCsr<sunrealtype>;
-    using SUNMatrixType           = sundials::ginkgo::BlockMatrix<GkoBatchMatrixType>;
-    using GkoSolverType           = gko::solver::BatchGmres<sunrealtype>;
-    using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, SUNMatrixType>;
+    using GkoMatrixType           = gko::matrix::Csr<amrex::Real>;
+    using GkoBatchMatrixType      = gko::matrix::BatchCsr<amrex::Real>;
+    using GkoSolverType           = gko::solver::BatchGmres<amrex::Real>;
+    using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
 
-    auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<sunrealtype>::build().on(gko_exec));
+    auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build().on(gko_exec));
     precond_factory = nullptr;
 
     auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
                                                precond_factory, user_data->ncells,
                                                *amrex::sundials::The_Sundials_Context());
     LSview->setEnableScaling(user_data->scaling);
-    LS = LSview->get();
+    LS = LSview->Convert();
     flag = CVodeSetLinearSolver(cvode_mem, LS, A);
     if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
       return (1);
@@ -1306,20 +1305,19 @@ ReactorCvode::react(
 #endif
   } else if (user_data->solve_type == cvode::ginkgoBICGSTAB) {
 #ifdef PELE_USE_GINKGO
-    using GkoMatrixType           = gko::matrix::Csr<sunrealtype>;
-    using GkoBatchMatrixType      = gko::matrix::BatchCsr<sunrealtype>;
-    using SUNMatrixType           = sundials::ginkgo::BlockMatrix<GkoBatchMatrixType>;
-    using GkoSolverType           = gko::solver::BatchBicgstab<sunrealtype>;
-    using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, SUNMatrixType>;
+    using GkoMatrixType           = gko::matrix::Csr<amrex::Real>;
+    using GkoBatchMatrixType      = gko::matrix::BatchCsr<amrex::Real>;
+    using GkoSolverType           = gko::solver::BatchBicgstab<amrex::Real>;
+    using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
 
-    auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<sunrealtype>::build().on(gko_exec));
+    auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build().on(gko_exec));
     precond_factory = nullptr;
 
     auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
                                                precond_factory, user_data->ncells,
                                                *amrex::sundials::The_Sundials_Context());
     LSview->setEnableScaling(user_data->scaling);
-    LS = LSview->get();
+    LS = LSview->Convert();
     flag = CVodeSetLinearSolver(cvode_mem, LS, A);
     if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
       return (1);
