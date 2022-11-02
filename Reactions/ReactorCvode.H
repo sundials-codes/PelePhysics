@@ -166,6 +166,10 @@ private:
   int max_nls_iters{3};
   int max_fp_accel{2};
 
+#ifdef PELE_USE_GINKGO
+  std::shared_ptr<const gko::Executor> gko_exec;
+#endif
+
 #ifndef AMREX_USE_GPU
   N_Vector y = nullptr;
   SUNLinearSolver LS = nullptr;

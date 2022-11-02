@@ -6,13 +6,6 @@ namespace pele::physics::reactions {
 
 namespace {
 
-#ifdef PELE_USE_GINKGO
-const auto gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
-  gko::HipExecutor::create(0, gko::OmpExecutor::create()),
-  gko::CudaExecutor::create(0, gko::OmpExecutor::create()),
-  gko::DpcppExecutor::create(0, gko::OmpExecutor::create()));
-#endif
-
 using utils::PrecondDescriptor;
 using utils::SolverDescriptor;
 
@@ -123,6 +116,14 @@ int
 ReactorCvode::init(int reactor_type, int ncells)
 {
   BL_PROFILE("Pele::ReactorCvode::init()");
+
+#ifdef PELE_USE_GINKGO
+  gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
+    gko::HipExecutor::create(amrex::Gpu::Device::deviceId()	, gko::OmpExecutor::create()),
+    gko::CudaExecutor::create(amrex::Gpu::Device::deviceId()	, gko::OmpExecutor::create()),
+    gko::DpcppExecutor::create(amrex::Gpu::Device::deviceId(), gko::OmpExecutor::create()));
+#endif
+
   m_reactor_type = reactor_type;
   ReactorTypes::check_reactor_type(m_reactor_type);
   amrex::ParmParse pp("ode");
@@ -1427,6 +1428,17 @@ ReactorCvode::react(
   }
   freeUserData(user_data);
 
+  // TODO(CJB): print out SUNMemoryHelper allocation stats
+  size_t bytes_allocated, bytes_high_watermark;
+  unsigned long long num_allocations, num_deallocations;
+  SUNMemoryHelper_GetAllocStats(*amrex::sundials::The_SUNMemory_Helper(),
+    &num_allocations, &num_deallocations, &bytes_allocated, &bytes_high_watermark);
+  amrex::Print() << "SUNMemoryHelper Stats:\n" <<
+    "          num_allocations = " << num_allocations << "\n" <<
+    "        num_deallocations = " << num_deallocations << "\n" <<
+    "          bytes_allocated = " << bytes_allocated / (1024*1024) << " MB\n" <<
+    "     bytes_high_watermark = " << bytes_high_watermark / (1024*1024) << " MB\n"; 
+
 #else
   //----------------------------------------------------------
   // CPU Region
@@ -1765,6 +1777,17 @@ ReactorCvode::react(
     SUNMatDestroy(A);
   }
   freeUserData(user_data);
+
+  // TODO(CJB): print out SUNMemoryHelper allocation stats
+  size_t bytes_allocated, bytes_high_watermark;
+  unsigned long long num_allocations, num_deallocations;
+  SUNMemoryHelper_GetAllocStats(*amrex::sundials::The_SUNMemory_Helper(),
+    &num_allocations, &num_deallocations, &bytes_allocated, &bytes_high_watermark);
+  amrex::Print() << "SUNMemoryHelper Stats:\n" <<
+    "          num_allocations = " << num_allocations << "\n" <<
+    "        num_deallocations = " << num_deallocations << "\n" <<
+    "          bytes_allocated = " << bytes_allocated / (1024*1024) << " MB\n" <<
+    "     bytes_high_watermark = " << bytes_high_watermark / (1024*1024) << " MB\n"; 
 
   //----------------------------------------------------------
   // CPU Region
