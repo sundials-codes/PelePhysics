@@ -336,5 +336,18 @@ setNVectorGPU(int nvsize, int atomic_reduction, amrex::gpuStream_t stream,
 void copyNVectorToDevice(N_Vector v);
 void copyNVectorFromDevice(N_Vector v);
 #endif
+
+struct PrecondDescriptor {
+  int identifier;
+  std::string text_description;
+};
+
+struct SolverDescriptor {
+  int identifier;
+  int analytical_jacobian;
+  std::unordered_map<std::string,PrecondDescriptor> precond_types;
+  std::string text_description;
+};
+
 } // namespace pele::physics::reactions::utils
 #endif
