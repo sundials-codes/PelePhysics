@@ -6,114 +6,6 @@ namespace pele::physics::reactions {
 
 namespace {
 
-using utils::PrecondDescriptor;
-using utils::SolverDescriptor;
-
-#ifdef AMREX_USE_GPU
-PrecondDescriptor sparseSimpleAJacPrecondGPU{
-  cvode::sparseSimpleAJac, "cuSPARSE simplified AJ-based preconditioner"};
-#else
-PrecondDescriptor customSimpleAJacPrecond{
-  cvode::customSimpleAJac, "custom AJ-based preconditioner"};
-PrecondDescriptor sparseSimpleAJacPrecondCPU{
-  cvode::sparseSimpleAJac, "sparse simplified AJ-based preconditioner"};
-PrecondDescriptor denseSimpleAJacPrecond{
-  cvode::denseSimpleAJac, "dense simplified AJ-based preconditioner"};
-#endif
-
-constexpr const int analytical_jacobian_no = 0;
-constexpr const int analytical_jacobian_yes = 1;
-
-const std::unordered_map<std::string, SolverDescriptor> available_solver_types
-{
-  // available for CPUs or GPUs
-  {"fixed_point",
-   SolverDescriptor{
-     cvode::fixedPoint,
-     analytical_jacobian_no,
-     {},
-     "fixed-point nonlinear solver"}},
-    {"GMRES",
-     SolverDescriptor{
-       cvode::GMRES, analytical_jacobian_no, {}, "JFNK GMRES linear solver"}},
-#ifdef AMREX_USE_GPU
-// available with GPUs only
-#ifdef PELE_USE_MAGMA
-    {"magma_direct",
-     SolverDescriptor{
-       cvode::magmaDirect,
-       analytical_jacobian_yes,
-       {},
-       "MAGMA batched LU direct linear solver with analytical Jacobian"}},
-#endif
-#ifdef PELE_USE_GINKGO
-    {"ginkgo_GMRES",
-     SolverDescriptor{
-       cvode::ginkgoGMRES,
-       analytical_jacobian_yes,
-       {},
-       "Ginkgo batched GMRES linear solver with analytical Jacobian"}},
-    {"ginkgo_BICGSTAB",
-     SolverDescriptor{
-       cvode::ginkgoBICGSTAB,
-       analytical_jacobian_yes,
-       {},
-       "Ginkgo batched BiCGSTAB linear solver with analytical Jacobian"}},
-#endif
-    {"sparse_direct",
-     SolverDescriptor{
-       cvode::sparseDirect,
-       analytical_jacobian_yes,
-       {},
-       "cuSPARSE batched sparse QR linear solver with analytical Jacobian"}},
-    {"precGMRES",
-     SolverDescriptor{
-       cvode::precGMRES, analytical_jacobian_no,
-       std::unordered_map<std::string, PrecondDescriptor>{
-         {"cuSparse_simplified_AJacobian", sparseSimpleAJacPrecondGPU}},
-       "JFNK GMRES linear solver"}},
-#else /*AMREX_USE_GPU*/
-    // available with CPUs only
-    {"dense_direct",
-     SolverDescriptor{
-       cvode::denseFDDirect,
-       analytical_jacobian_no,
-       {},
-       "dense direct linear solver with finite-difference Jacobian"}},
-    {"denseAJ_direct",
-     SolverDescriptor{
-       cvode::denseDirect,
-       analytical_jacobian_yes,
-       {},
-       "dense direct linear solver with analytical Jacobian"}},
-#ifdef PELE_USE_KLU
-    {"sparse_direct",
-     SolverDescriptor{
-       cvode::sparseDirect,
-       analytical_jacobian_yes,
-       {},
-       "KLU sparse direct linear solver with analytical Jacobian"}},
-#endif
-    {"custom_direct",
-     SolverDescriptor{
-       cvode::customDirect,
-       analytical_jacobian_yes,
-       {},
-       "custom direct linear solver with analytical Jacobian"}},
-    {"precGMRES",
-     SolverDescriptor{
-       cvode::precGMRES, analytical_jacobian_no,
-       std::unordered_map<std::string, PrecondDescriptor>{
-         {"custom_simplified_AJacobian", customSimpleAJacPrecond},
-         {"dense_simplified_AJacobian", denseSimpleAJacPrecond},
-         {"sparse_simplified_AJacobian", sparseSimpleAJacPrecondCPU},
-         "JFNK GMRES linear solver"}}
-#endif /*AMREX_USE_GPU*/
-};
-} // namespace
-
-namespace {
-
 #ifdef PELE_USE_GINKGO
 const auto gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
   gko::HipExecutor::create(0, gko::OmpExecutor::create()),
@@ -1475,21 +1367,19 @@ ReactorCvode::react(
 #endif
   } else if (user_data->solve_type == cvode::ginkgoGMRES) {
 #ifdef PELE_USE_GINKGO
-    using GkoMatrixType      = gko::matrix::Csr<amrex::Real>;
-    using GkoBatchMatrixType = gko::matrix::BatchCsr<amrex::Real>;
-    using SUNMatrixType      = sundials::ginkgo::BlockMatrix<GkoBatchMatrixType>;
+    using GkoMatrixType           = gko::matrix::Csr<amrex::Real>;
+    using GkoBatchMatrixType      = gko::matrix::BatchCsr<amrex::Real>;
     using GkoSolverType           = gko::solver::BatchGmres<amrex::Real>;
-    using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, SUNMatrixType>;
-    auto gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
-      gko::HipExecutor::create(0, gko::OmpExecutor::create()),
-      gko::CudaExecutor::create(0, gko::OmpExecutor::create()),
-      gko::DpcppExecutor::create(0, gko::OmpExecutor::create()));
+    using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
+
     auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build().on(gko_exec));
+    precond_factory = nullptr;
+
     auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
-                                               nullptr, user_data->ncells,
+                                               precond_factory, user_data->ncells,
                                                *amrex::sundials::The_Sundials_Context());
     LSview->setEnableScaling(linear_solver_scaling);
-    LS = LSview->get();
+    LS = LSview->Convert();
     flag = CVodeSetLinearSolver(cvode_mem, LS, A);
     if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
       return (1);
@@ -1503,16 +1393,18 @@ ReactorCvode::react(
 #endif
   } else if (user_data->solve_type == cvode::ginkgoBICGSTAB) {
 #ifdef PELE_USE_GINKGO
-    using GkoMatrixType           = gko::matrix::Csr<sunrealtype>;
-    using GkoBatchMatrixType      = gko::matrix::BatchCsr<sunrealtype>;
-    using SUNMatrixType           = sundials::ginkgo::BlockMatrix<GkoBatchMatrixType>;
-    using GkoSolverType           = gko::solver::BatchBicgstab<sunrealtype>;
+    using GkoMatrixType           = gko::matrix::Csr<amrex::Real>;
+    using GkoBatchMatrixType      = gko::matrix::BatchCsr<amrex::Real>;
+    using GkoSolverType           = gko::solver::BatchBicgstab<amrex::Real>;
     using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
-    // auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<sunrealtype>::build().on(gko_exec));
+
+    auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build().on(gko_exec));
+    precond_factory = nullptr;
+
     auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
-                                               nullptr, user_data->ncells,
+                                               precond_factory, user_data->ncells,
                                                *amrex::sundials::The_Sundials_Context());
-    LSview->setEnableScaling(user_data->scaling);
+    LSview->setEnableScaling(linear_solver_scaling);
     LS = LSview->Convert();
     flag = CVodeSetLinearSolver(cvode_mem, LS, A);
     if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
@@ -1624,16 +1516,16 @@ ReactorCvode::react(
   }
   freeUserData(user_data);
 
-  // TODO(CJB): print out SUNMemoryHelper allocation stats
-  size_t bytes_allocated, bytes_high_watermark;
-  unsigned long long num_allocations, num_deallocations;
-  SUNMemoryHelper_GetAllocStats(*amrex::sundials::The_SUNMemory_Helper(),
-    &num_allocations, &num_deallocations, &bytes_allocated, &bytes_high_watermark);
-  amrex::Print() << "SUNMemoryHelper Stats:\n" <<
-    "          num_allocations = " << num_allocations << "\n" <<
-    "        num_deallocations = " << num_deallocations << "\n" <<
-    "          bytes_allocated = " << bytes_allocated / (1024*1024) << " MB\n" <<
-    "     bytes_high_watermark = " << bytes_high_watermark / (1024*1024) << " MB\n"; 
+  // // TODO(CJB): print out SUNMemoryHelper allocation stats
+  // size_t bytes_allocated, bytes_high_watermark;
+  // unsigned long long num_allocations, num_deallocations;
+  // SUNMemoryHelper_GetAllocStats(*amrex::sundials::The_SUNMemory_Helper(),
+  //   &num_allocations, &num_deallocations, &bytes_allocated, &bytes_high_watermark);
+  // amrex::Print() << "SUNMemoryHelper Stats:\n" <<
+  //   "          num_allocations = " << num_allocations << "\n" <<
+  //   "        num_deallocations = " << num_deallocations << "\n" <<
+  //   "          bytes_allocated = " << bytes_allocated / (1024*1024) << " MB\n" <<
+  //   "     bytes_high_watermark = " << bytes_high_watermark / (1024*1024) << " MB\n"; 
 
 #else
   //----------------------------------------------------------
