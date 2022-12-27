@@ -120,8 +120,11 @@ ReactorCvode::init(int reactor_type, int ncells)
 {
   BL_PROFILE("Pele::ReactorCvode::init()");
 
+  static_assert(sizeof(amrex::Real) == sizeof(sunrealtype), "amrex::Real and sunrealtype are different sizes");
+  static_assert(sizeof(int) == sizeof(sunindextype), "int and sunindextype are different sizes");
+
 #ifdef PELE_USE_GINKGO
-  auto gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
+  gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
     gko::HipExecutor::create(amrex::Gpu::Device::deviceId()	, gko::OmpExecutor::create()),
     gko::CudaExecutor::create(amrex::Gpu::Device::deviceId()	, gko::OmpExecutor::create()),
     gko::DpcppExecutor::create(amrex::Gpu::Device::deviceId(), gko::OmpExecutor::create()));
