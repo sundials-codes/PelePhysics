@@ -6,6 +6,10 @@ int
 ReactorArkode::init(int reactor_type, int /*ncells*/)
 {
   BL_PROFILE("Pele::ReactorArkode::init()");
+ 
+  static_assert(sizeof(amrex::Real) == sizeof(sunrealtype), "amrex::Real and sunrealtype are different sizes");
+  static_assert(sizeof(int) == sizeof(sunindextype), "int and sunindextype are different sizes");
+ 
   m_reactor_type = reactor_type;
   ReactorTypes::check_reactor_type(m_reactor_type);
   amrex::ParmParse pp("ode");
