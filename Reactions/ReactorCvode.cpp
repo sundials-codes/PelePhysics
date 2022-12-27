@@ -6,13 +6,6 @@ namespace pele::physics::reactions {
 
 namespace {
 
-#ifdef PELE_USE_GINKGO
-const auto gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
-  gko::HipExecutor::create(0, gko::OmpExecutor::create()),
-  gko::CudaExecutor::create(0, gko::OmpExecutor::create()),
-  gko::DpcppExecutor::create(0, gko::OmpExecutor::create()));
-#endif
-
 using utils::PrecondDescriptor;
 using utils::SolverDescriptor;
 
@@ -128,7 +121,7 @@ ReactorCvode::init(int reactor_type, int ncells)
   BL_PROFILE("Pele::ReactorCvode::init()");
 
 #ifdef PELE_USE_GINKGO
-  gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
+  auto gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
     gko::HipExecutor::create(amrex::Gpu::Device::deviceId()	, gko::OmpExecutor::create()),
     gko::CudaExecutor::create(amrex::Gpu::Device::deviceId()	, gko::OmpExecutor::create()),
     gko::DpcppExecutor::create(amrex::Gpu::Device::deviceId(), gko::OmpExecutor::create()));
@@ -993,12 +986,12 @@ ReactorCvode::allocUserData(
 
     SPARSITY_INFO_SYST(&(udata->NNZ), &HP, 1);
 
-    udata->csr_jac_d = (amrex::Real*)amrex::The_Arena()->alloc(
-      udata->NNZ * a_ncells * sizeof(amrex::Real));
-    udata->csr_row_count_h =
-      (int*)amrex::The_Pinned_Arena()->alloc((NUM_SPECIES + 2) * sizeof(int));
-    udata->csr_col_index_h =
-      (int*)amrex::The_Pinned_Arena()->alloc(udata->NNZ * sizeof(int));
+    udata->csr_jac_d = static_cast<amrex::Real*>(amrex::The_Arena()->alloc(
+      udata->NNZ * a_ncells * sizeof(amrex::Real)));
+    udata->csr_row_count_h = static_cast<int*>(
+      amrex::The_Pinned_Arena()->alloc((NUM_SPECIES + 2) * sizeof(int)));
+    udata->csr_col_index_h = static_cast<int*>(
+      amrex::The_Pinned_Arena()->alloc(udata->NNZ * sizeof(int)));
 
     SPARSITY_PREPROC_SYST_CSR(
       udata->csr_col_index_h, udata->csr_row_count_h, &HP, 1, 0);
@@ -1376,8 +1369,8 @@ ReactorCvode::react(
     precond_factory = nullptr;
 
     auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
-                                               precond_factory, user_data->ncells,
-                                               *amrex::sundials::The_Sundials_Context());
+                                              precond_factory, user_data->ncells,
+                                              *amrex::sundials::The_Sundials_Context());
     LSview->setEnableScaling(linear_solver_scaling);
     LS = LSview->Convert();
     flag = CVodeSetLinearSolver(cvode_mem, LS, A);
@@ -1402,8 +1395,8 @@ ReactorCvode::react(
     precond_factory = nullptr;
 
     auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
-                                               precond_factory, user_data->ncells,
-                                               *amrex::sundials::The_Sundials_Context());
+                                              precond_factory, user_data->ncells,
+                                              *amrex::sundials::The_Sundials_Context());
     LSview->setEnableScaling(linear_solver_scaling);
     LS = LSview->Convert();
     flag = CVodeSetLinearSolver(cvode_mem, LS, A);
@@ -1867,16 +1860,16 @@ ReactorCvode::react(
   }
   freeUserData(user_data);
 
-  // TODO(CJB): print out SUNMemoryHelper allocation stats
-  size_t bytes_allocated, bytes_high_watermark;
-  unsigned long long num_allocations, num_deallocations;
-  SUNMemoryHelper_GetAllocStats(*amrex::sundials::The_SUNMemory_Helper(),
-    &num_allocations, &num_deallocations, &bytes_allocated, &bytes_high_watermark);
-  amrex::Print() << "SUNMemoryHelper Stats:\n" <<
-    "          num_allocations = " << num_allocations << "\n" <<
-    "        num_deallocations = " << num_deallocations << "\n" <<
-    "          bytes_allocated = " << bytes_allocated / (1024*1024) << " MB\n" <<
-    "     bytes_high_watermark = " << bytes_high_watermark / (1024*1024) << " MB\n"; 
+  // // TODO(CJB): print out SUNMemoryHelper allocation stats
+  // size_t bytes_allocated, bytes_high_watermark;
+  // unsigned long long num_allocations, num_deallocations;
+  // SUNMemoryHelper_GetAllocStats(*amrex::sundials::The_SUNMemory_Helper(),
+  //   &num_allocations, &num_deallocations, &bytes_allocated, &bytes_high_watermark);
+  // amrex::Print() << "SUNMemoryHelper Stats:\n" <<
+  //   "          num_allocations = " << num_allocations << "\n" <<
+  //   "        num_deallocations = " << num_deallocations << "\n" <<
+  //   "          bytes_allocated = " << bytes_allocated / (1024*1024) << " MB\n" <<
+  //   "     bytes_high_watermark = " << bytes_high_watermark / (1024*1024) << " MB\n"; 
 
   //----------------------------------------------------------
   // CPU Region
