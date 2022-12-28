@@ -120,14 +120,21 @@ ReactorCvode::init(int reactor_type, int ncells)
 {
   BL_PROFILE("Pele::ReactorCvode::init()");
 
-  static_assert(sizeof(amrex::Real) == sizeof(sunrealtype), "amrex::Real and sunrealtype are different sizes");
-  static_assert(sizeof(int) == sizeof(sunindextype), "int and sunindextype are different sizes");
+  static_assert(
+    sizeof(amrex::Real) == sizeof(sunrealtype),
+    "amrex::Real and sunrealtype are different sizes");
+  static_assert(
+    sizeof(int) == sizeof(sunindextype),
+    "int and sunindextype are different sizes");
 
 #ifdef PELE_USE_GINKGO
   gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
-    gko::HipExecutor::create(amrex::Gpu::Device::deviceId()	, gko::OmpExecutor::create()),
-    gko::CudaExecutor::create(amrex::Gpu::Device::deviceId()	, gko::OmpExecutor::create()),
-    gko::DpcppExecutor::create(amrex::Gpu::Device::deviceId(), gko::OmpExecutor::create()));
+    gko::HipExecutor::create(
+      amrex::Gpu::Device::deviceId(), gko::OmpExecutor::create()),
+    gko::CudaExecutor::create(
+      amrex::Gpu::Device::deviceId(), gko::OmpExecutor::create()),
+    gko::DpcppExecutor::create(
+      amrex::Gpu::Device::deviceId(), gko::OmpExecutor::create()));
 #endif
 
   m_reactor_type = reactor_type;
@@ -420,7 +427,7 @@ ReactorCvode::init(int reactor_type, int ncells)
   if (utils::check_flag(&flag, "setCvodeOptions", 1))
     return (1);
 
-  // End of CPU section
+    // End of CPU section
 #endif
 
   return (0);
@@ -480,7 +487,6 @@ ReactorCvode::checkCvodeSolveType()
     amrex::Abort(abort_message);
   }
 }
-
 
 void
 ReactorCvode::printExtraSolveInformation() const
@@ -753,19 +759,24 @@ ReactorCvode::setCvodeOptions(void* cvode_mem, bool analytical_jacobian) const
   if (utils::check_flag(&flag, "CVodeSetEpsLin", 1) != 0) {
     return 1;
   }
-  flag = CVodeSetNonlinConvCoef(cvode_mem, nonlin_conv_coef); // Nonlinear solver convergence safety factor
+  flag = CVodeSetNonlinConvCoef(
+    cvode_mem, nonlin_conv_coef); // Nonlinear solver convergence safety factor
   if (utils::check_flag(&flag, "CVodeSetNonlinConvCoef", 1) != 0) {
     return 1;
   }
-  flag = CVodeSetMaxConvFails(cvode_mem, max_conv_fails); //Max nonlinear solver convergence failures per step
+  flag = CVodeSetMaxConvFails(
+    cvode_mem,
+    max_conv_fails); // Max nonlinear solver convergence failures per step
   if (utils::check_flag(&flag, "CVodeSetMaxConvFails", 1) != 0) {
     return 1;
   }
-  flag = CVodeSetEtaConvFail(cvode_mem, eta_cf); // Step size change after solver failure
+  flag = CVodeSetEtaConvFail(
+    cvode_mem, eta_cf); // Step size change after solver failure
   if (utils::check_flag(&flag, "CVodeSetEtaConvFail", 1) != 0) {
     return 1;
   }
-  flag = CVodeSetEtaFixedStepBounds(cvode_mem, eta_min_fx, eta_max_fx); // Fixed step eta bounds
+  flag = CVodeSetEtaFixedStepBounds(
+    cvode_mem, eta_min_fx, eta_max_fx); // Fixed step eta bounds
   if (utils::check_flag(&flag, "CVodeSetEtaFixedStepBounds", 1) != 0) {
     return 1;
   }
@@ -777,19 +788,24 @@ ReactorCvode::setCvodeOptions(void* cvode_mem, bool analytical_jacobian) const
   if (utils::check_flag(&flag, "CVodeSetEtaMin", 1) != 0) {
     return 1;
   }
-  flag = CVodeSetEtaMinErrFail(cvode_mem, eta_min_ef); // Min step size change on err test fail
+  flag = CVodeSetEtaMinErrFail(
+    cvode_mem, eta_min_ef); // Min step size change on err test fail
   if (utils::check_flag(&flag, "CVodeSetEtaMinErrFail", 1) != 0) {
     return 1;
   }
-  flag = CVodeSetLSetupFrequency(cvode_mem, msbp); // Linear solver setup frequency
+  flag =
+    CVodeSetLSetupFrequency(cvode_mem, msbp); // Linear solver setup frequency
   if (utils::check_flag(&flag, "CVodeSetLSetupFrequency", 1) != 0) {
     return 1;
   }
-  flag = CVodeSetDeltaGammaMaxLSetup(cvode_mem, dgmax); // Step size ratio limit signalling re-setup of linear solver
+  flag = CVodeSetDeltaGammaMaxLSetup(
+    cvode_mem,
+    dgmax); // Step size ratio limit signalling re-setup of linear solver
   if (utils::check_flag(&flag, "CVodeSetDeltaGammaMaxLSetup", 1) != 0) {
     return 1;
   }
-  flag = CVodeSetMaxErrTestFails(cvode_mem, max_err_test_fails); // Max Err.test failure
+  flag = CVodeSetMaxErrTestFails(
+    cvode_mem, max_err_test_fails); // Max Err.test failure
   if (utils::check_flag(&flag, "CVodeSetMaxErrTestFails", 1) != 0) {
     return 1;
   }
@@ -827,53 +843,13 @@ ReactorCvode::allocUserData(
 #endif
 ) const
 {
-  // // Query options
-  // std::string solve_type_str = "none";
-  // amrex::ParmParse ppcv("cvode");
-  // ppcv.query("solve_type", solve_type_str);
-
-  udata->solve_type = this->solve_type;
-  udata->analytical_jacobian = this->analytical_jacobian;
-  udata->precond_type = this->precond_type;
-
-  // // Check for valid solve_type and precond_type, and set
-  // // udata->solve_type, udata->analytical_jacobian, udata->precond_type.
-  // auto st = available_solver_types.find(solve_type_str);
-  // if (st != available_solver_types.end()) {
-  //   udata->solve_type = st->second.identifier;
-  //   udata->analytical_jacobian = st->second.analytical_jacobian;
-  //   auto precond_types = st->second.precond_types;
-  //   if (precond_types.size() > 0) {
-  //     std::string prec_type_str = "";
-  //     ppcv.query("precond_type", prec_type_str);
-
-  //     auto pt = precond_types.find(prec_type_str);
-  //     if (pt != precond_types.end()) {
-  //       udata->precond_type = pt->second.identifier;
-  //     } else {
-  //       std::string abort_message = "Wrong precond_type. Options are:\n";
-  //       for (const auto& precond_type : precond_types) {
-  //         abort_message.append("  ");
-  //         abort_message.append(precond_type.first);
-  //         abort_message.append("\n");
-  //       }
-  //       amrex::Abort(abort_message);
-  //     }
-  //   }
-  // } else {
-  //   std::string abort_message = "Wrong solve_type. Options are:\n";
-  //   for (const auto& solver_type : available_solver_types) {
-  //     abort_message.append("  ");
-  //     abort_message.append(solver_type.first);
-  //     abort_message.append("\n");
-  //   }
-  //   amrex::Abort(abort_message);
-  // }
-
   // Pass options to udata
   const int HP =
     static_cast<int>(m_reactor_type == ReactorTypes::h_reactor_type);
   int nspec_tot = (NUM_SPECIES)*a_ncells;
+  udata->solve_type = this->solve_type;
+  udata->analytical_jacobian = this->analytical_jacobian;
+  udata->precond_type = this->precond_type;
   udata->reactor_type = m_reactor_type;
   udata->ncells = a_ncells;
   udata->verbose = verbose;
@@ -989,8 +965,8 @@ ReactorCvode::allocUserData(
 
     SPARSITY_INFO_SYST(&(udata->NNZ), &HP, 1);
 
-    udata->csr_jac_d = static_cast<amrex::Real*>(amrex::The_Arena()->alloc(
-      udata->NNZ * a_ncells * sizeof(amrex::Real)));
+    udata->csr_jac_d = static_cast<amrex::Real*>(
+      amrex::The_Arena()->alloc(udata->NNZ * a_ncells * sizeof(amrex::Real)));
     udata->csr_row_count_h = static_cast<int*>(
       amrex::The_Pinned_Arena()->alloc((NUM_SPECIES + 2) * sizeof(int)));
     udata->csr_col_index_h = static_cast<int*>(
@@ -1003,10 +979,10 @@ ReactorCvode::allocUserData(
       a_ncells, gko::dim<2>(NUM_SPECIES + 1, NUM_SPECIES + 1));
     auto values_view = gko::Array<amrex::Real>::view(
       gko_exec, a_ncells * udata->NNZ, udata->csr_jac_d);
-    auto rowptrs_view = gko::Array<int>::view(
-      gko_exec, NUM_SPECIES + 2, udata->csr_row_count_h);
-    auto colidxs_view = gko::Array<int>::view(
-      gko_exec, udata->NNZ, udata->csr_col_index_h);
+    auto rowptrs_view =
+      gko::Array<int>::view(gko_exec, NUM_SPECIES + 2, udata->csr_row_count_h);
+    auto colidxs_view =
+      gko::Array<int>::view(gko_exec, udata->NNZ, udata->csr_col_index_h);
     auto gko_batch_matrix = gko::share(GkoBatchMatrixType::create(
       gko_exec, batch_mat_size, std::move(values_view), std::move(colidxs_view),
       std::move(rowptrs_view)));
@@ -1363,17 +1339,19 @@ ReactorCvode::react(
 #endif
   } else if (user_data->solve_type == cvode::ginkgoGMRES) {
 #ifdef PELE_USE_GINKGO
-    using GkoMatrixType           = gko::matrix::Csr<amrex::Real>;
-    using GkoBatchMatrixType      = gko::matrix::BatchCsr<amrex::Real>;
-    using GkoSolverType           = gko::solver::BatchGmres<amrex::Real>;
-    using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
+    using GkoMatrixType = gko::matrix::Csr<amrex::Real>;
+    using GkoBatchMatrixType = gko::matrix::BatchCsr<amrex::Real>;
+    using GkoSolverType = gko::solver::BatchGmres<amrex::Real>;
+    using SUNLinearSolverViewType =
+      sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
 
-    auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build().on(gko_exec));
+    auto precond_factory = gko::share(
+      gko::preconditioner::BatchJacobi<amrex::Real>::build().on(gko_exec));
     precond_factory = nullptr;
 
-    auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
-                                              precond_factory, user_data->ncells,
-                                              *amrex::sundials::The_Sundials_Context());
+    auto LSview = new SUNLinearSolverViewType(
+      gko_exec, gko::stop::batch::ToleranceType::absolute, precond_factory,
+      user_data->ncells, *amrex::sundials::The_Sundials_Context());
     LSview->setEnableScaling(linear_solver_scaling);
     LS = LSview->Convert();
     flag = CVodeSetLinearSolver(cvode_mem, LS, A);
@@ -1389,17 +1367,19 @@ ReactorCvode::react(
 #endif
   } else if (user_data->solve_type == cvode::ginkgoBICGSTAB) {
 #ifdef PELE_USE_GINKGO
-    using GkoMatrixType           = gko::matrix::Csr<amrex::Real>;
-    using GkoBatchMatrixType      = gko::matrix::BatchCsr<amrex::Real>;
-    using GkoSolverType           = gko::solver::BatchBicgstab<amrex::Real>;
-    using SUNLinearSolverViewType = sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
+    using GkoMatrixType = gko::matrix::Csr<amrex::Real>;
+    using GkoBatchMatrixType = gko::matrix::BatchCsr<amrex::Real>;
+    using GkoSolverType = gko::solver::BatchBicgstab<amrex::Real>;
+    using SUNLinearSolverViewType =
+      sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
 
-    auto precond_factory = gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build().on(gko_exec));
+    auto precond_factory = gko::share(
+      gko::preconditioner::BatchJacobi<amrex::Real>::build().on(gko_exec));
     precond_factory = nullptr;
 
-    auto LSview = new SUNLinearSolverViewType(gko_exec, gko::stop::batch::ToleranceType::absolute,
-                                              precond_factory, user_data->ncells,
-                                              *amrex::sundials::The_Sundials_Context());
+    auto LSview = new SUNLinearSolverViewType(
+      gko_exec, gko::stop::batch::ToleranceType::absolute, precond_factory,
+      user_data->ncells, *amrex::sundials::The_Sundials_Context());
     LSview->setEnableScaling(linear_solver_scaling);
     LS = LSview->Convert();
     flag = CVodeSetLinearSolver(cvode_mem, LS, A);
@@ -1516,12 +1496,14 @@ ReactorCvode::react(
   // size_t bytes_allocated, bytes_high_watermark;
   // unsigned long long num_allocations, num_deallocations;
   // SUNMemoryHelper_GetAllocStats(*amrex::sundials::The_SUNMemory_Helper(),
-  //   &num_allocations, &num_deallocations, &bytes_allocated, &bytes_high_watermark);
+  //   &num_allocations, &num_deallocations, &bytes_allocated,
+  //   &bytes_high_watermark);
   // amrex::Print() << "SUNMemoryHelper Stats:\n" <<
   //   "          num_allocations = " << num_allocations << "\n" <<
   //   "        num_deallocations = " << num_deallocations << "\n" <<
-  //   "          bytes_allocated = " << bytes_allocated / (1024*1024) << " MB\n" <<
-  //   "     bytes_high_watermark = " << bytes_high_watermark / (1024*1024) << " MB\n"; 
+  //   "          bytes_allocated = " << bytes_allocated / (1024*1024) << "
+  //   MB\n" << "     bytes_high_watermark = " << bytes_high_watermark /
+  //   (1024*1024) << " MB\n";
 
 #else
   //----------------------------------------------------------
@@ -1867,12 +1849,14 @@ ReactorCvode::react(
   // size_t bytes_allocated, bytes_high_watermark;
   // unsigned long long num_allocations, num_deallocations;
   // SUNMemoryHelper_GetAllocStats(*amrex::sundials::The_SUNMemory_Helper(),
-  //   &num_allocations, &num_deallocations, &bytes_allocated, &bytes_high_watermark);
+  //   &num_allocations, &num_deallocations, &bytes_allocated,
+  //   &bytes_high_watermark);
   // amrex::Print() << "SUNMemoryHelper Stats:\n" <<
   //   "          num_allocations = " << num_allocations << "\n" <<
   //   "        num_deallocations = " << num_deallocations << "\n" <<
-  //   "          bytes_allocated = " << bytes_allocated / (1024*1024) << " MB\n" <<
-  //   "     bytes_high_watermark = " << bytes_high_watermark / (1024*1024) << " MB\n"; 
+  //   "          bytes_allocated = " << bytes_allocated / (1024*1024) << "
+  //   MB\n" << "     bytes_high_watermark = " << bytes_high_watermark /
+  //   (1024*1024) << " MB\n";
 
   //----------------------------------------------------------
   // CPU Region
