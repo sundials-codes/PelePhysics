@@ -143,7 +143,7 @@ ReactorCvode::init(int reactor_type, int ncells)
   amrex::ParmParse ppcv("cvode");
   ppcv.query("max_order", max_order);
   ppcv.query("max_err_test_fails", max_err_test_fails);
-  ppcv.query("scaling", linear_solver_scaling);
+  ppcv.query("linear_solver_scaling", linear_solver_scaling);
   ppcv.query("dgmax", dgmax);
   ppcv.query("epslin", epslin);
   ppcv.query("eta_cf", eta_cf);

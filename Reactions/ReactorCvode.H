@@ -188,10 +188,10 @@ private:
 
   // This block of CVODE parameters are initialized to the CVODE default values.
   // WARNING: it is unwise to change these without a really good reason. The
-  // default values have been empircally proven to be robust and optimal for
+  // default values have been empirically proven to be robust and optimal for
   // many types of problems. It may be possible to achieve better performance
   // for a specific problem with different values, so the parameters can be
-  // changed, but do so with extreme care.
+  // changed, but do so with *extreme care and purpose*.
 
   // CVODE integrator parameters related to time step size selection:
   // https://sundials.readthedocs.io/en/latest/cvode/Usage/index.html#id10
