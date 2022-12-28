@@ -121,8 +121,16 @@ PSolve(
   cudaError_t cuda_status = cudaDeviceSynchronize();
   AMREX_ASSERT(cuda_status == cudaSuccess);
 
-  utils::copyNVectorFromDevice(z);
-  utils::copyNVectorFromDevice(r);
+#if defined(AMREX_USE_CUDA)
+  N_VCopyFromDevice_Cuda(z);
+  N_VCopyFromDevice_Cuda(r);
+#elif defined(AMREX_USE_HIP)
+  N_VCopyFromDevice_Hip(z);
+  N_VCopyFromDevice_Hip(r);
+#elif defined(AMREX_USE_DPCPP)
+  N_VCopyFromDevice_Sycl(z);
+  N_VCopyFromDevice_Sycl(r);
+#endif
 
   return (0);
 }
