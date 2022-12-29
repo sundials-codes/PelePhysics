@@ -68,26 +68,13 @@ ReactorBase::set_sundials_solver_tols(
 
   const int neq_tot = (NUM_SPECIES + 1) * ncells;
 
-#if defined(AMREX_USE_CUDA)
-  N_Vector atol = N_VNewWithMemHelp_Cuda(
-    neq_tot, /*use_managed_mem=*/false,
-    *amrex::sundials::The_SUNMemory_Helper(), sunctx);
-  amrex::Real* ratol = N_VGetHostArrayPointer_Cuda(atol);
-#elif defined(AMREX_USE_HIP)
-  N_Vector atol = N_VNewWithMemHelp_Hip(
-    neq_tot, /*use_managed_mem=*/false,
-    *amrex::sundials::The_SUNMemory_Helper(), sunctx);
-  amrex::Real* ratol = N_VGetHostArrayPointer_Hip(atol);
-#elif defined(AMREX_USE_DPCPP)
-  N_Vector atol = N_VNewWithMemHelp_Sycl(
-    neq_tot, /*use_managed_mem=*/false,
-    *amrex::sundials::The_SUNMemory_Helper(),
-    &amrex::Gpu::Device::streamQueue(), sunctx);
-  amrex::Real* ratol = N_VGetHostArrayPointer_Sycl(atol);
+#if defined(AMREX_USE_GPU)
+  N_Vector atol = utils::setNVectorGPU(neq_tot, atomic_reductions,
+    amrex::Gpu::Device::gpuStream(), sunctx);
 #else
   N_Vector atol = N_VNew_Serial(neq_tot, sunctx);
-  amrex::Real* ratol = N_VGetArrayPointer(atol);
 #endif
+  amrex::Real* ratol = N_VGetArrayPointer(atol);
 
   if (m_typ_vals[0] > 0.0) {
     // cppcheck-suppress knownConditionTrueFalse
@@ -114,12 +101,8 @@ ReactorBase::set_sundials_solver_tols(
     }
   }
 
-#if defined(AMREX_USE_CUDA)
-  N_VCopyToDevice_Cuda(atol);
-#elif defined(AMREX_USE_HIP)
-  N_VCopyToDevice_Hip(atol);
-#elif defined(AMREX_USE_DPCPP)
-  N_VCopyToDevice_Sycl(atol);
+#ifdef AMREX_USE_GPU
+  utils::copyNVectorToDevice(atol);
 #endif
 
   // Call CVodeSVtolerances to specify the scalar relative tolerance
