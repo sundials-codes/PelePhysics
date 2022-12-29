@@ -206,7 +206,7 @@ private:
   amrex::Real dgmax{
     0.3}; // Max allowed gamma change without a linear solver setup
   amrex::Real epslin{0.0}; // Ratio between linear and nonlinear tolerances
-  int msbj{100};           // Jacobian / preconditioner update frequency
+  int msbj{51};            // Jacobian / preconditioner update frequency
   int msbp{
     20};       // Linear solver setup frequency (e.g. refactorization frequency)
   int maxl{5}; // max # of Krylov subspace vectors (for GMRES)
@@ -218,7 +218,7 @@ private:
     3}; // max # of nonlinear solver iterations before considering
   int max_conv_fails{
     10};               // max # of nonlinear solver convergence failures before
-  int max_fp_accel{2}; // max # of Anderson Acceleration vectors (if using the
+  int max_fp_accel{0}; // max # of Anderson Acceleration vectors (if using the
                        // fixed-point nonlinear solver)
 };
 } // namespace pele::physics::reactions

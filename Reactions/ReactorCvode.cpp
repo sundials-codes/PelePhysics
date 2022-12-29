@@ -755,55 +755,55 @@ ReactorCvode::setCvodeOptions(void* cvode_mem, bool analytical_jacobian) const
   if (utils::check_flag(&flag, "CVodeSetMaxNonlinIters", 1) != 0) {
     return 1;
   }
-  // flag = CVodeSetEpsLin(cvode_mem, epslin); // Linear solver tolerance factor
-  // if (utils::check_flag(&flag, "CVodeSetEpsLin", 1) != 0) {
-  //   return 1;
-  // }
-  // flag = CVodeSetNonlinConvCoef(
-  //   cvode_mem, nonlin_conv_coef); // Nonlinear solver convergence safety factor
-  // if (utils::check_flag(&flag, "CVodeSetNonlinConvCoef", 1) != 0) {
-  //   return 1;
-  // }
-  // flag = CVodeSetMaxConvFails(
-  //   cvode_mem,
-  //   max_conv_fails); // Max nonlinear solver convergence failures per step
-  // if (utils::check_flag(&flag, "CVodeSetMaxConvFails", 1) != 0) {
-  //   return 1;
-  // }
-  // flag = CVodeSetEtaConvFail(
-  //   cvode_mem, eta_cf); // Step size change after solver failure
-  // if (utils::check_flag(&flag, "CVodeSetEtaConvFail", 1) != 0) {
-  //   return 1;
-  // }
-  // flag = CVodeSetEtaFixedStepBounds(
-  //   cvode_mem, eta_min_fx, eta_max_fx); // Fixed step eta bounds
-  // if (utils::check_flag(&flag, "CVodeSetEtaFixedStepBounds", 1) != 0) {
-  //   return 1;
-  // }
-  // flag = CVodeSetEtaMax(cvode_mem, eta_max_gs); // Max step size change
-  // if (utils::check_flag(&flag, "CVodeSetEtaMax", 1) != 0) {
-  //   return 1;
-  // }
-  // flag = CVodeSetEtaMin(cvode_mem, eta_min); // Min step size change
-  // if (utils::check_flag(&flag, "CVodeSetEtaMin", 1) != 0) {
-  //   return 1;
-  // }
-  // flag = CVodeSetEtaMinErrFail(
-  //   cvode_mem, eta_min_ef); // Min step size change on err test fail
-  // if (utils::check_flag(&flag, "CVodeSetEtaMinErrFail", 1) != 0) {
-  //   return 1;
-  // }
-  // flag =
-  //   CVodeSetLSetupFrequency(cvode_mem, msbp); // Linear solver setup frequency
-  // if (utils::check_flag(&flag, "CVodeSetLSetupFrequency", 1) != 0) {
-  //   return 1;
-  // }
-  // flag = CVodeSetDeltaGammaMaxLSetup(
-  //   cvode_mem,
-  //   dgmax); // Step size ratio limit signalling re-setup of linear solver
-  // if (utils::check_flag(&flag, "CVodeSetDeltaGammaMaxLSetup", 1) != 0) {
-  //   return 1;
-  // }
+  flag = CVodeSetEpsLin(cvode_mem, epslin); // Linear solver tolerance factor
+  if (utils::check_flag(&flag, "CVodeSetEpsLin", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetNonlinConvCoef(
+    cvode_mem, nonlin_conv_coef); // Nonlinear solver convergence safety factor
+  if (utils::check_flag(&flag, "CVodeSetNonlinConvCoef", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetMaxConvFails(
+    cvode_mem,
+    max_conv_fails); // Max nonlinear solver convergence failures per step
+  if (utils::check_flag(&flag, "CVodeSetMaxConvFails", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetEtaConvFail(
+    cvode_mem, eta_cf); // Step size change after solver failure
+  if (utils::check_flag(&flag, "CVodeSetEtaConvFail", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetEtaFixedStepBounds(
+    cvode_mem, eta_min_fx, eta_max_fx); // Fixed step eta bounds
+  if (utils::check_flag(&flag, "CVodeSetEtaFixedStepBounds", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetEtaMax(cvode_mem, eta_max_gs); // Max step size change
+  if (utils::check_flag(&flag, "CVodeSetEtaMax", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetEtaMin(cvode_mem, eta_min); // Min step size change
+  if (utils::check_flag(&flag, "CVodeSetEtaMin", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetEtaMinErrFail(
+    cvode_mem, eta_min_ef); // Min step size change on err test fail
+  if (utils::check_flag(&flag, "CVodeSetEtaMinErrFail", 1) != 0) {
+    return 1;
+  }
+  flag =
+    CVodeSetLSetupFrequency(cvode_mem, msbp); // Linear solver setup frequency
+  if (utils::check_flag(&flag, "CVodeSetLSetupFrequency", 1) != 0) {
+    return 1;
+  }
+  flag = CVodeSetDeltaGammaMaxLSetup(
+    cvode_mem,
+    dgmax); // Step size ratio limit signalling re-setup of linear solver
+  if (utils::check_flag(&flag, "CVodeSetDeltaGammaMaxLSetup", 1) != 0) {
+    return 1;
+  }
   flag = CVodeSetMaxErrTestFails(
     cvode_mem, max_err_test_fails); // Max Err.test failure
   if (utils::check_flag(&flag, "CVodeSetMaxErrTestFails", 1) != 0) {
