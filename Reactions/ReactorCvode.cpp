@@ -128,7 +128,7 @@ ReactorCvode::init(int reactor_type, int ncells)
     "int and sunindextype are different sizes");
 
 #ifdef PELE_USE_GINKGO
-  gko_exec = AMREX_HIP_OR_CUDA_OR_DPCPP(
+  gko_exec = AMREX_HIP_OR_CUDA_OR_SYCL(
     gko::HipExecutor::create(
       amrex::Gpu::Device::deviceId(), gko::OmpExecutor::create()),
     gko::CudaExecutor::create(
