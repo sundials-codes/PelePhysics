@@ -13,8 +13,8 @@ using utils::SolverDescriptor;
 PrecondDescriptor sparseSimpleAJacPrecondGPU{
   cvode::sparseSimpleAJac, "cuSPARSE simplified AJ-based preconditioner"};
 #else
-PrecondDescriptor customSimpleAJacPrecond{
-  cvode::customSimpleAJac, "custom AJ-based preconditioner"};
+PrecondDescriptor customSimpleAJacPrecond{cvode::customSimpleAJac,
+                                          "custom AJ-based preconditioner"};
 PrecondDescriptor sparseSimpleAJacPrecondCPU{
   cvode::sparseSimpleAJac, "sparse simplified AJ-based preconditioner"};
 PrecondDescriptor denseSimpleAJacPrecond{
@@ -27,12 +27,10 @@ constexpr const int analytical_jacobian_yes = 1;
 const std::unordered_map<std::string, SolverDescriptor> available_solver_types
 {
   // available for CPUs or GPUs
-  {"fixed_point",
-   SolverDescriptor{
-     cvode::fixedPoint,
-     analytical_jacobian_no,
-     {},
-     "fixed-point nonlinear solver"}},
+  {"fixed_point", SolverDescriptor{cvode::fixedPoint,
+                                   analytical_jacobian_no,
+                                   {},
+                                   "fixed-point nonlinear solver"}},
     {"GMRES",
      SolverDescriptor{
        cvode::GMRES, analytical_jacobian_no, {}, "JFNK GMRES linear solver"}},
@@ -84,11 +82,10 @@ const std::unordered_map<std::string, SolverDescriptor> available_solver_types
        {},
        "dense direct linear solver with finite-difference Jacobian"}},
     {"denseAJ_direct",
-     SolverDescriptor{
-       cvode::denseDirect,
-       analytical_jacobian_yes,
-       {},
-       "dense direct linear solver with analytical Jacobian"}},
+     SolverDescriptor{cvode::denseDirect,
+                      analytical_jacobian_yes,
+                      {},
+                      "dense direct linear solver with analytical Jacobian"}},
 #ifdef PELE_USE_KLU
     {"sparse_direct",
      SolverDescriptor{
@@ -98,11 +95,10 @@ const std::unordered_map<std::string, SolverDescriptor> available_solver_types
        "KLU sparse direct linear solver with analytical Jacobian"}},
 #endif
     {"custom_direct",
-     SolverDescriptor{
-       cvode::customDirect,
-       analytical_jacobian_yes,
-       {},
-       "custom direct linear solver with analytical Jacobian"}},
+     SolverDescriptor{cvode::customDirect,
+                      analytical_jacobian_yes,
+                      {},
+                      "custom direct linear solver with analytical Jacobian"}},
     {"precGMRES",
      SolverDescriptor{
        cvode::precGMRES, analytical_jacobian_no,
@@ -841,7 +837,7 @@ ReactorCvode::allocUserData(
   SUNMatrix& a_A,
   amrex::gpuStream_t stream
 #endif
-) const
+  ) const
 {
   // Pass options to udata
   const int HP =
@@ -1345,9 +1341,10 @@ ReactorCvode::react(
     using SUNLinearSolverViewType =
       sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
 
-    auto precond_factory = gko::share(
-      gko::preconditioner::BatchJacobi<amrex::Real>::build().on(gko_exec));
-    precond_factory = nullptr;
+    auto precond_factory =
+      gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build()
+                   .with_max_block_size(1u)
+                   .on(gko_exec));
 
     auto LSview = new SUNLinearSolverViewType(
       gko_exec, gko::stop::batch::ToleranceType::absolute, precond_factory,
@@ -1373,9 +1370,10 @@ ReactorCvode::react(
     using SUNLinearSolverViewType =
       sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
 
-    auto precond_factory = gko::share(
-      gko::preconditioner::BatchJacobi<amrex::Real>::build().on(gko_exec));
-    precond_factory = nullptr;
+    auto precond_factory =
+      gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build()
+                   .with_max_block_size(1u)
+                   .on(gko_exec));
 
     auto LSview = new SUNLinearSolverViewType(
       gko_exec, gko::stop::batch::ToleranceType::absolute, precond_factory,
@@ -1526,7 +1524,7 @@ ReactorCvode::react(
   const auto captured_reactor_type = m_reactor_type;
   const auto captured_clean_init_massfrac = m_clean_init_massfrac;
   ParallelFor(
-    box, [=, &CvodeActual_time_final] AMREX_GPU_DEVICE(
+    box, [ =, &CvodeActual_time_final ] AMREX_GPU_DEVICE(
            int i, int j, int k) noexcept {
       if (mask(i, j, k) != -1) {
 
@@ -1950,11 +1948,12 @@ ReactorCvode::cF_RHS(
   auto* rhoe_init = udata->rhoe_init;
   auto* rhoesrc_ext = udata->rhoesrc_ext;
   auto* rYsrc_ext = udata->rYsrc_ext;
-  amrex::ParallelFor(ncells, [=] AMREX_GPU_DEVICE(int icell) noexcept {
-    utils::fKernelSpec<Ordering>(
-      icell, ncells, dt_save, reactor_type, yvec_d, ydot_d, rhoe_init,
-      rhoesrc_ext, rYsrc_ext);
-  });
+  amrex::ParallelFor(
+    ncells, [=] AMREX_GPU_DEVICE(int icell) noexcept {
+      utils::fKernelSpec<Ordering>(
+        icell, ncells, dt_save, reactor_type, yvec_d, ydot_d, rhoe_init,
+        rhoesrc_ext, rYsrc_ext);
+    });
   amrex::Gpu::Device::streamSynchronize();
   return 0;
 }
