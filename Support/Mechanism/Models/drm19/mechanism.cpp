@@ -291,7 +291,7 @@ SPARSITY_INFO(int* nJdata, const int* consP, int NCELLS)
   for (int n = 0; n < 21; n++) {
     conc[n] = 1.0 / 21.000000;
   }
-  aJacobian(Jac.data(), conc.data(), 1500.0, *consP);
+  aJacobian_roll(Jac.data(), conc.data(), 1500.0, *consP);
 
   int nJdata_tmp = 0;
   for (int k = 0; k < 22; k++) {
@@ -314,7 +314,7 @@ SPARSITY_INFO_SYST(int* nJdata, const int* consP, int NCELLS)
   for (int n = 0; n < 21; n++) {
     conc[n] = 1.0 / 21.000000;
   }
-  aJacobian(Jac.data(), conc.data(), 1500.0, *consP);
+  aJacobian_roll(Jac.data(), conc.data(), 1500.0, *consP);
 
   int nJdata_tmp = 0;
   for (int k = 0; k < 22; k++) {
@@ -342,7 +342,7 @@ SPARSITY_INFO_SYST_SIMPLIFIED(int* nJdata, const int* consP)
   for (int n = 0; n < 21; n++) {
     conc[n] = 1.0 / 21.000000;
   }
-  aJacobian_precond(Jac.data(), conc.data(), 1500.0, *consP);
+  aJacobian_precond_roll(Jac.data(), conc.data(), 1500.0, *consP);
 
   int nJdata_tmp = 0;
   for (int k = 0; k < 22; k++) {
@@ -370,7 +370,7 @@ SPARSITY_PREPROC_CSC(int* rowVals, int* colPtrs, const int* consP, int NCELLS)
   for (int n = 0; n < 21; n++) {
     conc[n] = 1.0 / 21.000000;
   }
-  aJacobian(Jac.data(), conc.data(), 1500.0, *consP);
+  aJacobian_roll(Jac.data(), conc.data(), 1500.0, *consP);
 
   colPtrs[0] = 0;
   int nJdata_tmp = 0;
@@ -400,7 +400,7 @@ SPARSITY_PREPROC_CSR(
   for (int n = 0; n < 21; n++) {
     conc[n] = 1.0 / 21.000000;
   }
-  aJacobian(Jac.data(), conc.data(), 1500.0, *consP);
+  aJacobian_roll(Jac.data(), conc.data(), 1500.0, *consP);
 
   if (base == 1) {
     rowPtrs[0] = 1;
@@ -446,7 +446,7 @@ SPARSITY_PREPROC_SYST_CSR(
   for (int n = 0; n < 21; n++) {
     conc[n] = 1.0 / 21.000000;
   }
-  aJacobian(Jac.data(), conc.data(), 1500.0, *consP);
+  aJacobian_roll(Jac.data(), conc.data(), 1500.0, *consP);
 
   if (base == 1) {
     rowPtr[0] = 1;
@@ -502,7 +502,7 @@ SPARSITY_PREPROC_SYST_SIMPLIFIED_CSC(
   for (int n = 0; n < 21; n++) {
     conc[n] = 1.0 / 21.000000;
   }
-  aJacobian_precond(Jac.data(), conc.data(), 1500.0, *consP);
+  aJacobian_precond_roll(Jac.data(), conc.data(), 1500.0, *consP);
 
   colPtrs[0] = 0;
   int nJdata_tmp = 0;
@@ -535,7 +535,7 @@ SPARSITY_PREPROC_SYST_SIMPLIFIED_CSR(
   for (int n = 0; n < 21; n++) {
     conc[n] = 1.0 / 21.000000;
   }
-  aJacobian_precond(Jac.data(), conc.data(), 1500.0, *consP);
+  aJacobian_precond_roll(Jac.data(), conc.data(), 1500.0, *consP);
 
   if (base == 1) {
     rowPtr[0] = 1;

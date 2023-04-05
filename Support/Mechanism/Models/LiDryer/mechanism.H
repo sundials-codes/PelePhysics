@@ -2904,7 +2904,7 @@ dcvpRdT(amrex::Real* species, const amrex::Real* tc)
 
 // compute an approx to the reaction Jacobian
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void
-aJacobian_precond(
+aJacobian_precond_roll(
   amrex::Real* J, const amrex::Real* sc, const amrex::Real T, const int HP)
 {
 
@@ -3016,13 +3016,13 @@ aJacobian_precond(
   dqdc[7] = dcdc_fac;
   dqdc[8] = dcdc_fac;
   for (int k = 0; k < 9; k++) {
-    J[10 * k + 1] -= dqdc[k];
-    J[10 * k + 3] -= dqdc[k];
-    J[10 * k + 6] += dqdc[k];
+    J[10 + k] -= dqdc[k];
+    J[30 + k] -= dqdc[k];
+    J[60 + k] += dqdc[k];
   }
-  J[91] -= dqdT; // dwdot[O2]/dT
-  J[93] -= dqdT; // dwdot[H]/dT
-  J[96] += dqdT; // dwdot[HO2]/dT
+  J[19] -= dqdT; // dwdot[O2]/dT
+  J[39] -= dqdT; // dwdot[H]/dT
+  J[69] += dqdT; // dwdot[HO2]/dT
 
   // reaction 15: H2O2 (+M) <=> 2 OH (+M)
   // a third-body and pressure-fall-off reaction
@@ -3088,11 +3088,11 @@ aJacobian_precond(
   dqdc[7] = dcdc_fac + k_f;
   dqdc[8] = dcdc_fac;
   for (int k = 0; k < 9; k++) {
-    J[10 * k + 5] += 2 * dqdc[k];
-    J[10 * k + 7] -= dqdc[k];
+    J[50 + k] += 2 * dqdc[k];
+    J[70 + k] -= dqdc[k];
   }
-  J[95] += 2 * dqdT; // dwdot[OH]/dT
-  J[97] -= dqdT;     // dwdot[H2O2]/dT
+  J[59] += 2 * dqdT; // dwdot[OH]/dT
+  J[79] -= dqdT;     // dwdot[H2O2]/dT
 
   // reaction 4: H2 + M <=> 2 H + M
   // a third-body and non-pressure-fall-off reaction
@@ -3128,11 +3128,11 @@ aJacobian_precond(
   dqdc[7] = q_nocor;
   dqdc[8] = q_nocor;
   for (int k = 0; k < 9; k++) {
-    J[10 * k + 0] -= dqdc[k];
-    J[10 * k + 3] += 2 * dqdc[k];
+    J[0 + k] -= dqdc[k];
+    J[30 + k] += 2 * dqdc[k];
   }
-  J[90] -= dqdT;     // dwdot[H2]/dT
-  J[93] += 2 * dqdT; // dwdot[H]/dT
+  J[9] -= dqdT;      // dwdot[H2]/dT
+  J[39] += 2 * dqdT; // dwdot[H]/dT
 
   // reaction 5: 2 O + M <=> O2 + M
   // a third-body and non-pressure-fall-off reaction
@@ -3168,11 +3168,11 @@ aJacobian_precond(
   dqdc[7] = q_nocor;
   dqdc[8] = q_nocor;
   for (int k = 0; k < 9; k++) {
-    J[10 * k + 1] += dqdc[k];
-    J[10 * k + 4] += -2 * dqdc[k];
+    J[10 + k] += dqdc[k];
+    J[40 + k] += -2 * dqdc[k];
   }
-  J[91] += dqdT;      // dwdot[O2]/dT
-  J[94] += -2 * dqdT; // dwdot[O]/dT
+  J[19] += dqdT;      // dwdot[O2]/dT
+  J[49] += -2 * dqdT; // dwdot[O]/dT
 
   // reaction 6: H + O + M <=> OH + M
   // a third-body and non-pressure-fall-off reaction
@@ -3209,13 +3209,13 @@ aJacobian_precond(
   dqdc[7] = q_nocor;
   dqdc[8] = q_nocor;
   for (int k = 0; k < 9; k++) {
-    J[10 * k + 3] -= dqdc[k];
-    J[10 * k + 4] -= dqdc[k];
-    J[10 * k + 5] += dqdc[k];
+    J[30 + k] -= dqdc[k];
+    J[40 + k] -= dqdc[k];
+    J[50 + k] += dqdc[k];
   }
-  J[93] -= dqdT; // dwdot[H]/dT
-  J[94] -= dqdT; // dwdot[O]/dT
-  J[95] += dqdT; // dwdot[OH]/dT
+  J[39] -= dqdT; // dwdot[H]/dT
+  J[49] -= dqdT; // dwdot[O]/dT
+  J[59] += dqdT; // dwdot[OH]/dT
 
   // reaction 7: H + OH + M <=> H2O + M
   // a third-body and non-pressure-fall-off reaction
@@ -3252,13 +3252,13 @@ aJacobian_precond(
   dqdc[7] = q_nocor;
   dqdc[8] = q_nocor;
   for (int k = 0; k < 9; k++) {
-    J[10 * k + 2] += dqdc[k];
-    J[10 * k + 3] -= dqdc[k];
-    J[10 * k + 5] -= dqdc[k];
+    J[20 + k] += dqdc[k];
+    J[30 + k] -= dqdc[k];
+    J[50 + k] -= dqdc[k];
   }
-  J[92] += dqdT; // dwdot[H2O]/dT
-  J[93] -= dqdT; // dwdot[H]/dT
-  J[95] -= dqdT; // dwdot[OH]/dT
+  J[29] += dqdT; // dwdot[H2O]/dT
+  J[39] -= dqdT; // dwdot[H]/dT
+  J[59] -= dqdT; // dwdot[OH]/dT
 
   // reaction 0: H + O2 <=> O + OH
   // a non-third-body and non-pressure-fall-off reaction
@@ -3283,32 +3283,32 @@ aJacobian_precond(
   // d()/d[O2]
   dqdci = +k_f * sc[3];
   J[11] -= dqdci; // dwdot[O2]/d[O2]
-  J[13] -= dqdci; // dwdot[H]/d[O2]
-  J[14] += dqdci; // dwdot[O]/d[O2]
-  J[15] += dqdci; // dwdot[OH]/d[O2]
+  J[31] -= dqdci; // dwdot[H]/d[O2]
+  J[41] += dqdci; // dwdot[O]/d[O2]
+  J[51] += dqdci; // dwdot[OH]/d[O2]
   // d()/d[H]
   dqdci = +k_f * sc[1];
-  J[31] -= dqdci; // dwdot[O2]/d[H]
+  J[13] -= dqdci; // dwdot[O2]/d[H]
   J[33] -= dqdci; // dwdot[H]/d[H]
-  J[34] += dqdci; // dwdot[O]/d[H]
-  J[35] += dqdci; // dwdot[OH]/d[H]
+  J[43] += dqdci; // dwdot[O]/d[H]
+  J[53] += dqdci; // dwdot[OH]/d[H]
   // d()/d[O]
   dqdci = -k_r * sc[5];
-  J[41] -= dqdci; // dwdot[O2]/d[O]
-  J[43] -= dqdci; // dwdot[H]/d[O]
+  J[14] -= dqdci; // dwdot[O2]/d[O]
+  J[34] -= dqdci; // dwdot[H]/d[O]
   J[44] += dqdci; // dwdot[O]/d[O]
-  J[45] += dqdci; // dwdot[OH]/d[O]
+  J[54] += dqdci; // dwdot[OH]/d[O]
   // d()/d[OH]
   dqdci = -k_r * sc[4];
-  J[51] -= dqdci; // dwdot[O2]/d[OH]
-  J[53] -= dqdci; // dwdot[H]/d[OH]
-  J[54] += dqdci; // dwdot[O]/d[OH]
+  J[15] -= dqdci; // dwdot[O2]/d[OH]
+  J[35] -= dqdci; // dwdot[H]/d[OH]
+  J[45] += dqdci; // dwdot[O]/d[OH]
   J[55] += dqdci; // dwdot[OH]/d[OH]
   // d()/dT
-  J[91] -= dqdT; // dwdot[O2]/dT
-  J[93] -= dqdT; // dwdot[H]/dT
-  J[94] += dqdT; // dwdot[O]/dT
-  J[95] += dqdT; // dwdot[OH]/dT
+  J[19] -= dqdT; // dwdot[O2]/dT
+  J[39] -= dqdT; // dwdot[H]/dT
+  J[49] += dqdT; // dwdot[O]/dT
+  J[59] += dqdT; // dwdot[OH]/dT
 
   // reaction 1: H2 + O <=> H + OH
   // a non-third-body and non-pressure-fall-off reaction
@@ -3332,33 +3332,33 @@ aJacobian_precond(
   wdot[5] += q; // OH
   // d()/d[H2]
   dqdci = +k_f * sc[4];
-  J[0] -= dqdci; // dwdot[H2]/d[H2]
-  J[3] += dqdci; // dwdot[H]/d[H2]
-  J[4] -= dqdci; // dwdot[O]/d[H2]
-  J[5] += dqdci; // dwdot[OH]/d[H2]
+  J[0] -= dqdci;  // dwdot[H2]/d[H2]
+  J[30] += dqdci; // dwdot[H]/d[H2]
+  J[40] -= dqdci; // dwdot[O]/d[H2]
+  J[50] += dqdci; // dwdot[OH]/d[H2]
   // d()/d[H]
   dqdci = -k_r * sc[5];
-  J[30] -= dqdci; // dwdot[H2]/d[H]
+  J[3] -= dqdci;  // dwdot[H2]/d[H]
   J[33] += dqdci; // dwdot[H]/d[H]
-  J[34] -= dqdci; // dwdot[O]/d[H]
-  J[35] += dqdci; // dwdot[OH]/d[H]
+  J[43] -= dqdci; // dwdot[O]/d[H]
+  J[53] += dqdci; // dwdot[OH]/d[H]
   // d()/d[O]
   dqdci = +k_f * sc[0];
-  J[40] -= dqdci; // dwdot[H2]/d[O]
-  J[43] += dqdci; // dwdot[H]/d[O]
+  J[4] -= dqdci;  // dwdot[H2]/d[O]
+  J[34] += dqdci; // dwdot[H]/d[O]
   J[44] -= dqdci; // dwdot[O]/d[O]
-  J[45] += dqdci; // dwdot[OH]/d[O]
+  J[54] += dqdci; // dwdot[OH]/d[O]
   // d()/d[OH]
   dqdci = -k_r * sc[3];
-  J[50] -= dqdci; // dwdot[H2]/d[OH]
-  J[53] += dqdci; // dwdot[H]/d[OH]
-  J[54] -= dqdci; // dwdot[O]/d[OH]
+  J[5] -= dqdci;  // dwdot[H2]/d[OH]
+  J[35] += dqdci; // dwdot[H]/d[OH]
+  J[45] -= dqdci; // dwdot[O]/d[OH]
   J[55] += dqdci; // dwdot[OH]/d[OH]
   // d()/dT
-  J[90] -= dqdT; // dwdot[H2]/dT
-  J[93] += dqdT; // dwdot[H]/dT
-  J[94] -= dqdT; // dwdot[O]/dT
-  J[95] += dqdT; // dwdot[OH]/dT
+  J[9] -= dqdT;  // dwdot[H2]/dT
+  J[39] += dqdT; // dwdot[H]/dT
+  J[49] -= dqdT; // dwdot[O]/dT
+  J[59] += dqdT; // dwdot[OH]/dT
 
   // reaction 2: H2 + OH <=> H + H2O
   // a non-third-body and non-pressure-fall-off reaction
@@ -3382,33 +3382,33 @@ aJacobian_precond(
   wdot[5] -= q; // OH
   // d()/d[H2]
   dqdci = +k_f * sc[5];
-  J[0] -= dqdci; // dwdot[H2]/d[H2]
-  J[2] += dqdci; // dwdot[H2O]/d[H2]
-  J[3] += dqdci; // dwdot[H]/d[H2]
-  J[5] -= dqdci; // dwdot[OH]/d[H2]
+  J[0] -= dqdci;  // dwdot[H2]/d[H2]
+  J[20] += dqdci; // dwdot[H2O]/d[H2]
+  J[30] += dqdci; // dwdot[H]/d[H2]
+  J[50] -= dqdci; // dwdot[OH]/d[H2]
   // d()/d[H2O]
   dqdci = -k_r * sc[3];
-  J[20] -= dqdci; // dwdot[H2]/d[H2O]
+  J[2] -= dqdci;  // dwdot[H2]/d[H2O]
   J[22] += dqdci; // dwdot[H2O]/d[H2O]
-  J[23] += dqdci; // dwdot[H]/d[H2O]
-  J[25] -= dqdci; // dwdot[OH]/d[H2O]
+  J[32] += dqdci; // dwdot[H]/d[H2O]
+  J[52] -= dqdci; // dwdot[OH]/d[H2O]
   // d()/d[H]
   dqdci = -k_r * sc[2];
-  J[30] -= dqdci; // dwdot[H2]/d[H]
-  J[32] += dqdci; // dwdot[H2O]/d[H]
+  J[3] -= dqdci;  // dwdot[H2]/d[H]
+  J[23] += dqdci; // dwdot[H2O]/d[H]
   J[33] += dqdci; // dwdot[H]/d[H]
-  J[35] -= dqdci; // dwdot[OH]/d[H]
+  J[53] -= dqdci; // dwdot[OH]/d[H]
   // d()/d[OH]
   dqdci = +k_f * sc[0];
-  J[50] -= dqdci; // dwdot[H2]/d[OH]
-  J[52] += dqdci; // dwdot[H2O]/d[OH]
-  J[53] += dqdci; // dwdot[H]/d[OH]
+  J[5] -= dqdci;  // dwdot[H2]/d[OH]
+  J[25] += dqdci; // dwdot[H2O]/d[OH]
+  J[35] += dqdci; // dwdot[H]/d[OH]
   J[55] -= dqdci; // dwdot[OH]/d[OH]
   // d()/dT
-  J[90] -= dqdT; // dwdot[H2]/dT
-  J[92] += dqdT; // dwdot[H2O]/dT
-  J[93] += dqdT; // dwdot[H]/dT
-  J[95] -= dqdT; // dwdot[OH]/dT
+  J[9] -= dqdT;  // dwdot[H2]/dT
+  J[29] += dqdT; // dwdot[H2O]/dT
+  J[39] += dqdT; // dwdot[H]/dT
+  J[59] -= dqdT; // dwdot[OH]/dT
 
   // reaction 3: H2O + O <=> 2 OH
   // a non-third-body and non-pressure-fall-off reaction
@@ -3432,22 +3432,22 @@ aJacobian_precond(
   // d()/d[H2O]
   dqdci = +k_f * sc[4];
   J[22] -= dqdci;     // dwdot[H2O]/d[H2O]
-  J[24] -= dqdci;     // dwdot[O]/d[H2O]
-  J[25] += 2 * dqdci; // dwdot[OH]/d[H2O]
+  J[42] -= dqdci;     // dwdot[O]/d[H2O]
+  J[52] += 2 * dqdci; // dwdot[OH]/d[H2O]
   // d()/d[O]
   dqdci = +k_f * sc[2];
-  J[42] -= dqdci;     // dwdot[H2O]/d[O]
+  J[24] -= dqdci;     // dwdot[H2O]/d[O]
   J[44] -= dqdci;     // dwdot[O]/d[O]
-  J[45] += 2 * dqdci; // dwdot[OH]/d[O]
+  J[54] += 2 * dqdci; // dwdot[OH]/d[O]
   // d()/d[OH]
   dqdci = -k_r * 2.000000 * sc[5];
-  J[52] -= dqdci;     // dwdot[H2O]/d[OH]
-  J[54] -= dqdci;     // dwdot[O]/d[OH]
+  J[25] -= dqdci;     // dwdot[H2O]/d[OH]
+  J[45] -= dqdci;     // dwdot[O]/d[OH]
   J[55] += 2 * dqdci; // dwdot[OH]/d[OH]
   // d()/dT
-  J[92] -= dqdT;     // dwdot[H2O]/dT
-  J[94] -= dqdT;     // dwdot[O]/dT
-  J[95] += 2 * dqdT; // dwdot[OH]/dT
+  J[29] -= dqdT;     // dwdot[H2O]/dT
+  J[49] -= dqdT;     // dwdot[O]/dT
+  J[59] += 2 * dqdT; // dwdot[OH]/dT
 
   // reaction 9: H + HO2 <=> H2 + O2
   // a non-third-body and non-pressure-fall-off reaction
@@ -3471,33 +3471,33 @@ aJacobian_precond(
   wdot[6] -= q; // HO2
   // d()/d[H2]
   dqdci = -k_r * sc[1];
-  J[0] += dqdci; // dwdot[H2]/d[H2]
-  J[1] += dqdci; // dwdot[O2]/d[H2]
-  J[3] -= dqdci; // dwdot[H]/d[H2]
-  J[6] -= dqdci; // dwdot[HO2]/d[H2]
+  J[0] += dqdci;  // dwdot[H2]/d[H2]
+  J[10] += dqdci; // dwdot[O2]/d[H2]
+  J[30] -= dqdci; // dwdot[H]/d[H2]
+  J[60] -= dqdci; // dwdot[HO2]/d[H2]
   // d()/d[O2]
   dqdci = -k_r * sc[0];
-  J[10] += dqdci; // dwdot[H2]/d[O2]
+  J[1] += dqdci;  // dwdot[H2]/d[O2]
   J[11] += dqdci; // dwdot[O2]/d[O2]
-  J[13] -= dqdci; // dwdot[H]/d[O2]
-  J[16] -= dqdci; // dwdot[HO2]/d[O2]
+  J[31] -= dqdci; // dwdot[H]/d[O2]
+  J[61] -= dqdci; // dwdot[HO2]/d[O2]
   // d()/d[H]
   dqdci = +k_f * sc[6];
-  J[30] += dqdci; // dwdot[H2]/d[H]
-  J[31] += dqdci; // dwdot[O2]/d[H]
+  J[3] += dqdci;  // dwdot[H2]/d[H]
+  J[13] += dqdci; // dwdot[O2]/d[H]
   J[33] -= dqdci; // dwdot[H]/d[H]
-  J[36] -= dqdci; // dwdot[HO2]/d[H]
+  J[63] -= dqdci; // dwdot[HO2]/d[H]
   // d()/d[HO2]
   dqdci = +k_f * sc[3];
-  J[60] += dqdci; // dwdot[H2]/d[HO2]
-  J[61] += dqdci; // dwdot[O2]/d[HO2]
-  J[63] -= dqdci; // dwdot[H]/d[HO2]
+  J[6] += dqdci;  // dwdot[H2]/d[HO2]
+  J[16] += dqdci; // dwdot[O2]/d[HO2]
+  J[36] -= dqdci; // dwdot[H]/d[HO2]
   J[66] -= dqdci; // dwdot[HO2]/d[HO2]
   // d()/dT
-  J[90] += dqdT; // dwdot[H2]/dT
-  J[91] += dqdT; // dwdot[O2]/dT
-  J[93] -= dqdT; // dwdot[H]/dT
-  J[96] -= dqdT; // dwdot[HO2]/dT
+  J[9] += dqdT;  // dwdot[H2]/dT
+  J[19] += dqdT; // dwdot[O2]/dT
+  J[39] -= dqdT; // dwdot[H]/dT
+  J[69] -= dqdT; // dwdot[HO2]/dT
 
   // reaction 10: H + HO2 <=> 2 OH
   // a non-third-body and non-pressure-fall-off reaction
@@ -3521,22 +3521,22 @@ aJacobian_precond(
   // d()/d[H]
   dqdci = +k_f * sc[6];
   J[33] -= dqdci;     // dwdot[H]/d[H]
-  J[35] += 2 * dqdci; // dwdot[OH]/d[H]
-  J[36] -= dqdci;     // dwdot[HO2]/d[H]
+  J[53] += 2 * dqdci; // dwdot[OH]/d[H]
+  J[63] -= dqdci;     // dwdot[HO2]/d[H]
   // d()/d[OH]
   dqdci = -k_r * 2.000000 * sc[5];
-  J[53] -= dqdci;     // dwdot[H]/d[OH]
+  J[35] -= dqdci;     // dwdot[H]/d[OH]
   J[55] += 2 * dqdci; // dwdot[OH]/d[OH]
-  J[56] -= dqdci;     // dwdot[HO2]/d[OH]
+  J[65] -= dqdci;     // dwdot[HO2]/d[OH]
   // d()/d[HO2]
   dqdci = +k_f * sc[3];
-  J[63] -= dqdci;     // dwdot[H]/d[HO2]
-  J[65] += 2 * dqdci; // dwdot[OH]/d[HO2]
+  J[36] -= dqdci;     // dwdot[H]/d[HO2]
+  J[56] += 2 * dqdci; // dwdot[OH]/d[HO2]
   J[66] -= dqdci;     // dwdot[HO2]/d[HO2]
   // d()/dT
-  J[93] -= dqdT;     // dwdot[H]/dT
-  J[95] += 2 * dqdT; // dwdot[OH]/dT
-  J[96] -= dqdT;     // dwdot[HO2]/dT
+  J[39] -= dqdT;     // dwdot[H]/dT
+  J[59] += 2 * dqdT; // dwdot[OH]/dT
+  J[69] -= dqdT;     // dwdot[HO2]/dT
 
   // reaction 11: HO2 + O <=> O2 + OH
   // a non-third-body and non-pressure-fall-off reaction
@@ -3561,32 +3561,32 @@ aJacobian_precond(
   // d()/d[O2]
   dqdci = -k_r * sc[5];
   J[11] += dqdci; // dwdot[O2]/d[O2]
-  J[14] -= dqdci; // dwdot[O]/d[O2]
-  J[15] += dqdci; // dwdot[OH]/d[O2]
-  J[16] -= dqdci; // dwdot[HO2]/d[O2]
+  J[41] -= dqdci; // dwdot[O]/d[O2]
+  J[51] += dqdci; // dwdot[OH]/d[O2]
+  J[61] -= dqdci; // dwdot[HO2]/d[O2]
   // d()/d[O]
   dqdci = +k_f * sc[6];
-  J[41] += dqdci; // dwdot[O2]/d[O]
+  J[14] += dqdci; // dwdot[O2]/d[O]
   J[44] -= dqdci; // dwdot[O]/d[O]
-  J[45] += dqdci; // dwdot[OH]/d[O]
-  J[46] -= dqdci; // dwdot[HO2]/d[O]
+  J[54] += dqdci; // dwdot[OH]/d[O]
+  J[64] -= dqdci; // dwdot[HO2]/d[O]
   // d()/d[OH]
   dqdci = -k_r * sc[1];
-  J[51] += dqdci; // dwdot[O2]/d[OH]
-  J[54] -= dqdci; // dwdot[O]/d[OH]
+  J[15] += dqdci; // dwdot[O2]/d[OH]
+  J[45] -= dqdci; // dwdot[O]/d[OH]
   J[55] += dqdci; // dwdot[OH]/d[OH]
-  J[56] -= dqdci; // dwdot[HO2]/d[OH]
+  J[65] -= dqdci; // dwdot[HO2]/d[OH]
   // d()/d[HO2]
   dqdci = +k_f * sc[4];
-  J[61] += dqdci; // dwdot[O2]/d[HO2]
-  J[64] -= dqdci; // dwdot[O]/d[HO2]
-  J[65] += dqdci; // dwdot[OH]/d[HO2]
+  J[16] += dqdci; // dwdot[O2]/d[HO2]
+  J[46] -= dqdci; // dwdot[O]/d[HO2]
+  J[56] += dqdci; // dwdot[OH]/d[HO2]
   J[66] -= dqdci; // dwdot[HO2]/d[HO2]
   // d()/dT
-  J[91] += dqdT; // dwdot[O2]/dT
-  J[94] -= dqdT; // dwdot[O]/dT
-  J[95] += dqdT; // dwdot[OH]/dT
-  J[96] -= dqdT; // dwdot[HO2]/dT
+  J[19] += dqdT; // dwdot[O2]/dT
+  J[49] -= dqdT; // dwdot[O]/dT
+  J[59] += dqdT; // dwdot[OH]/dT
+  J[69] -= dqdT; // dwdot[HO2]/dT
 
   // reaction 12: HO2 + OH <=> H2O + O2
   // a non-third-body and non-pressure-fall-off reaction
@@ -3611,32 +3611,32 @@ aJacobian_precond(
   // d()/d[O2]
   dqdci = -k_r * sc[2];
   J[11] += dqdci; // dwdot[O2]/d[O2]
-  J[12] += dqdci; // dwdot[H2O]/d[O2]
-  J[15] -= dqdci; // dwdot[OH]/d[O2]
-  J[16] -= dqdci; // dwdot[HO2]/d[O2]
+  J[21] += dqdci; // dwdot[H2O]/d[O2]
+  J[51] -= dqdci; // dwdot[OH]/d[O2]
+  J[61] -= dqdci; // dwdot[HO2]/d[O2]
   // d()/d[H2O]
   dqdci = -k_r * sc[1];
-  J[21] += dqdci; // dwdot[O2]/d[H2O]
+  J[12] += dqdci; // dwdot[O2]/d[H2O]
   J[22] += dqdci; // dwdot[H2O]/d[H2O]
-  J[25] -= dqdci; // dwdot[OH]/d[H2O]
-  J[26] -= dqdci; // dwdot[HO2]/d[H2O]
+  J[52] -= dqdci; // dwdot[OH]/d[H2O]
+  J[62] -= dqdci; // dwdot[HO2]/d[H2O]
   // d()/d[OH]
   dqdci = +k_f * sc[6];
-  J[51] += dqdci; // dwdot[O2]/d[OH]
-  J[52] += dqdci; // dwdot[H2O]/d[OH]
+  J[15] += dqdci; // dwdot[O2]/d[OH]
+  J[25] += dqdci; // dwdot[H2O]/d[OH]
   J[55] -= dqdci; // dwdot[OH]/d[OH]
-  J[56] -= dqdci; // dwdot[HO2]/d[OH]
+  J[65] -= dqdci; // dwdot[HO2]/d[OH]
   // d()/d[HO2]
   dqdci = +k_f * sc[5];
-  J[61] += dqdci; // dwdot[O2]/d[HO2]
-  J[62] += dqdci; // dwdot[H2O]/d[HO2]
-  J[65] -= dqdci; // dwdot[OH]/d[HO2]
+  J[16] += dqdci; // dwdot[O2]/d[HO2]
+  J[26] += dqdci; // dwdot[H2O]/d[HO2]
+  J[56] -= dqdci; // dwdot[OH]/d[HO2]
   J[66] -= dqdci; // dwdot[HO2]/d[HO2]
   // d()/dT
-  J[91] += dqdT; // dwdot[O2]/dT
-  J[92] += dqdT; // dwdot[H2O]/dT
-  J[95] -= dqdT; // dwdot[OH]/dT
-  J[96] -= dqdT; // dwdot[HO2]/dT
+  J[19] += dqdT; // dwdot[O2]/dT
+  J[29] += dqdT; // dwdot[H2O]/dT
+  J[59] -= dqdT; // dwdot[OH]/dT
+  J[69] -= dqdT; // dwdot[HO2]/dT
 
   // reaction 13: 2 HO2 <=> H2O2 + O2
   // a non-third-body and non-pressure-fall-off reaction
@@ -3660,22 +3660,22 @@ aJacobian_precond(
   // d()/d[O2]
   dqdci = -k_r * sc[7];
   J[11] += dqdci;      // dwdot[O2]/d[O2]
-  J[16] += -2 * dqdci; // dwdot[HO2]/d[O2]
-  J[17] += dqdci;      // dwdot[H2O2]/d[O2]
+  J[61] += -2 * dqdci; // dwdot[HO2]/d[O2]
+  J[71] += dqdci;      // dwdot[H2O2]/d[O2]
   // d()/d[HO2]
   dqdci = +k_f * 2.000000 * sc[6];
-  J[61] += dqdci;      // dwdot[O2]/d[HO2]
+  J[16] += dqdci;      // dwdot[O2]/d[HO2]
   J[66] += -2 * dqdci; // dwdot[HO2]/d[HO2]
-  J[67] += dqdci;      // dwdot[H2O2]/d[HO2]
+  J[76] += dqdci;      // dwdot[H2O2]/d[HO2]
   // d()/d[H2O2]
   dqdci = -k_r * sc[1];
-  J[71] += dqdci;      // dwdot[O2]/d[H2O2]
-  J[76] += -2 * dqdci; // dwdot[HO2]/d[H2O2]
+  J[17] += dqdci;      // dwdot[O2]/d[H2O2]
+  J[67] += -2 * dqdci; // dwdot[HO2]/d[H2O2]
   J[77] += dqdci;      // dwdot[H2O2]/d[H2O2]
   // d()/dT
-  J[91] += dqdT;      // dwdot[O2]/dT
-  J[96] += -2 * dqdT; // dwdot[HO2]/dT
-  J[97] += dqdT;      // dwdot[H2O2]/dT
+  J[19] += dqdT;      // dwdot[O2]/dT
+  J[69] += -2 * dqdT; // dwdot[HO2]/dT
+  J[79] += dqdT;      // dwdot[H2O2]/dT
 
   // reaction 14: 2 HO2 <=> H2O2 + O2
   // a non-third-body and non-pressure-fall-off reaction
@@ -3699,22 +3699,22 @@ aJacobian_precond(
   // d()/d[O2]
   dqdci = -k_r * sc[7];
   J[11] += dqdci;      // dwdot[O2]/d[O2]
-  J[16] += -2 * dqdci; // dwdot[HO2]/d[O2]
-  J[17] += dqdci;      // dwdot[H2O2]/d[O2]
+  J[61] += -2 * dqdci; // dwdot[HO2]/d[O2]
+  J[71] += dqdci;      // dwdot[H2O2]/d[O2]
   // d()/d[HO2]
   dqdci = +k_f * 2.000000 * sc[6];
-  J[61] += dqdci;      // dwdot[O2]/d[HO2]
+  J[16] += dqdci;      // dwdot[O2]/d[HO2]
   J[66] += -2 * dqdci; // dwdot[HO2]/d[HO2]
-  J[67] += dqdci;      // dwdot[H2O2]/d[HO2]
+  J[76] += dqdci;      // dwdot[H2O2]/d[HO2]
   // d()/d[H2O2]
   dqdci = -k_r * sc[1];
-  J[71] += dqdci;      // dwdot[O2]/d[H2O2]
-  J[76] += -2 * dqdci; // dwdot[HO2]/d[H2O2]
+  J[17] += dqdci;      // dwdot[O2]/d[H2O2]
+  J[67] += -2 * dqdci; // dwdot[HO2]/d[H2O2]
   J[77] += dqdci;      // dwdot[H2O2]/d[H2O2]
   // d()/dT
-  J[91] += dqdT;      // dwdot[O2]/dT
-  J[96] += -2 * dqdT; // dwdot[HO2]/dT
-  J[97] += dqdT;      // dwdot[H2O2]/dT
+  J[19] += dqdT;      // dwdot[O2]/dT
+  J[69] += -2 * dqdT; // dwdot[HO2]/dT
+  J[79] += dqdT;      // dwdot[H2O2]/dT
 
   // reaction 16: H + H2O2 <=> H2O + OH
   // a non-third-body and non-pressure-fall-off reaction
@@ -3739,32 +3739,32 @@ aJacobian_precond(
   // d()/d[H2O]
   dqdci = -k_r * sc[5];
   J[22] += dqdci; // dwdot[H2O]/d[H2O]
-  J[23] -= dqdci; // dwdot[H]/d[H2O]
-  J[25] += dqdci; // dwdot[OH]/d[H2O]
-  J[27] -= dqdci; // dwdot[H2O2]/d[H2O]
+  J[32] -= dqdci; // dwdot[H]/d[H2O]
+  J[52] += dqdci; // dwdot[OH]/d[H2O]
+  J[72] -= dqdci; // dwdot[H2O2]/d[H2O]
   // d()/d[H]
   dqdci = +k_f * sc[7];
-  J[32] += dqdci; // dwdot[H2O]/d[H]
+  J[23] += dqdci; // dwdot[H2O]/d[H]
   J[33] -= dqdci; // dwdot[H]/d[H]
-  J[35] += dqdci; // dwdot[OH]/d[H]
-  J[37] -= dqdci; // dwdot[H2O2]/d[H]
+  J[53] += dqdci; // dwdot[OH]/d[H]
+  J[73] -= dqdci; // dwdot[H2O2]/d[H]
   // d()/d[OH]
   dqdci = -k_r * sc[2];
-  J[52] += dqdci; // dwdot[H2O]/d[OH]
-  J[53] -= dqdci; // dwdot[H]/d[OH]
+  J[25] += dqdci; // dwdot[H2O]/d[OH]
+  J[35] -= dqdci; // dwdot[H]/d[OH]
   J[55] += dqdci; // dwdot[OH]/d[OH]
-  J[57] -= dqdci; // dwdot[H2O2]/d[OH]
+  J[75] -= dqdci; // dwdot[H2O2]/d[OH]
   // d()/d[H2O2]
   dqdci = +k_f * sc[3];
-  J[72] += dqdci; // dwdot[H2O]/d[H2O2]
-  J[73] -= dqdci; // dwdot[H]/d[H2O2]
-  J[75] += dqdci; // dwdot[OH]/d[H2O2]
+  J[27] += dqdci; // dwdot[H2O]/d[H2O2]
+  J[37] -= dqdci; // dwdot[H]/d[H2O2]
+  J[57] += dqdci; // dwdot[OH]/d[H2O2]
   J[77] -= dqdci; // dwdot[H2O2]/d[H2O2]
   // d()/dT
-  J[92] += dqdT; // dwdot[H2O]/dT
-  J[93] -= dqdT; // dwdot[H]/dT
-  J[95] += dqdT; // dwdot[OH]/dT
-  J[97] -= dqdT; // dwdot[H2O2]/dT
+  J[29] += dqdT; // dwdot[H2O]/dT
+  J[39] -= dqdT; // dwdot[H]/dT
+  J[59] += dqdT; // dwdot[OH]/dT
+  J[79] -= dqdT; // dwdot[H2O2]/dT
 
   // reaction 17: H + H2O2 <=> H2 + HO2
   // a non-third-body and non-pressure-fall-off reaction
@@ -3788,33 +3788,33 @@ aJacobian_precond(
   wdot[7] -= q; // H2O2
   // d()/d[H2]
   dqdci = -k_r * sc[6];
-  J[0] += dqdci; // dwdot[H2]/d[H2]
-  J[3] -= dqdci; // dwdot[H]/d[H2]
-  J[6] += dqdci; // dwdot[HO2]/d[H2]
-  J[7] -= dqdci; // dwdot[H2O2]/d[H2]
+  J[0] += dqdci;  // dwdot[H2]/d[H2]
+  J[30] -= dqdci; // dwdot[H]/d[H2]
+  J[60] += dqdci; // dwdot[HO2]/d[H2]
+  J[70] -= dqdci; // dwdot[H2O2]/d[H2]
   // d()/d[H]
   dqdci = +k_f * sc[7];
-  J[30] += dqdci; // dwdot[H2]/d[H]
+  J[3] += dqdci;  // dwdot[H2]/d[H]
   J[33] -= dqdci; // dwdot[H]/d[H]
-  J[36] += dqdci; // dwdot[HO2]/d[H]
-  J[37] -= dqdci; // dwdot[H2O2]/d[H]
+  J[63] += dqdci; // dwdot[HO2]/d[H]
+  J[73] -= dqdci; // dwdot[H2O2]/d[H]
   // d()/d[HO2]
   dqdci = -k_r * sc[0];
-  J[60] += dqdci; // dwdot[H2]/d[HO2]
-  J[63] -= dqdci; // dwdot[H]/d[HO2]
+  J[6] += dqdci;  // dwdot[H2]/d[HO2]
+  J[36] -= dqdci; // dwdot[H]/d[HO2]
   J[66] += dqdci; // dwdot[HO2]/d[HO2]
-  J[67] -= dqdci; // dwdot[H2O2]/d[HO2]
+  J[76] -= dqdci; // dwdot[H2O2]/d[HO2]
   // d()/d[H2O2]
   dqdci = +k_f * sc[3];
-  J[70] += dqdci; // dwdot[H2]/d[H2O2]
-  J[73] -= dqdci; // dwdot[H]/d[H2O2]
-  J[76] += dqdci; // dwdot[HO2]/d[H2O2]
+  J[7] += dqdci;  // dwdot[H2]/d[H2O2]
+  J[37] -= dqdci; // dwdot[H]/d[H2O2]
+  J[67] += dqdci; // dwdot[HO2]/d[H2O2]
   J[77] -= dqdci; // dwdot[H2O2]/d[H2O2]
   // d()/dT
-  J[90] += dqdT; // dwdot[H2]/dT
-  J[93] -= dqdT; // dwdot[H]/dT
-  J[96] += dqdT; // dwdot[HO2]/dT
-  J[97] -= dqdT; // dwdot[H2O2]/dT
+  J[9] += dqdT;  // dwdot[H2]/dT
+  J[39] -= dqdT; // dwdot[H]/dT
+  J[69] += dqdT; // dwdot[HO2]/dT
+  J[79] -= dqdT; // dwdot[H2O2]/dT
 
   // reaction 18: H2O2 + O <=> HO2 + OH
   // a non-third-body and non-pressure-fall-off reaction
@@ -3839,32 +3839,32 @@ aJacobian_precond(
   // d()/d[O]
   dqdci = +k_f * sc[7];
   J[44] -= dqdci; // dwdot[O]/d[O]
-  J[45] += dqdci; // dwdot[OH]/d[O]
-  J[46] += dqdci; // dwdot[HO2]/d[O]
-  J[47] -= dqdci; // dwdot[H2O2]/d[O]
+  J[54] += dqdci; // dwdot[OH]/d[O]
+  J[64] += dqdci; // dwdot[HO2]/d[O]
+  J[74] -= dqdci; // dwdot[H2O2]/d[O]
   // d()/d[OH]
   dqdci = -k_r * sc[6];
-  J[54] -= dqdci; // dwdot[O]/d[OH]
+  J[45] -= dqdci; // dwdot[O]/d[OH]
   J[55] += dqdci; // dwdot[OH]/d[OH]
-  J[56] += dqdci; // dwdot[HO2]/d[OH]
-  J[57] -= dqdci; // dwdot[H2O2]/d[OH]
+  J[65] += dqdci; // dwdot[HO2]/d[OH]
+  J[75] -= dqdci; // dwdot[H2O2]/d[OH]
   // d()/d[HO2]
   dqdci = -k_r * sc[5];
-  J[64] -= dqdci; // dwdot[O]/d[HO2]
-  J[65] += dqdci; // dwdot[OH]/d[HO2]
+  J[46] -= dqdci; // dwdot[O]/d[HO2]
+  J[56] += dqdci; // dwdot[OH]/d[HO2]
   J[66] += dqdci; // dwdot[HO2]/d[HO2]
-  J[67] -= dqdci; // dwdot[H2O2]/d[HO2]
+  J[76] -= dqdci; // dwdot[H2O2]/d[HO2]
   // d()/d[H2O2]
   dqdci = +k_f * sc[4];
-  J[74] -= dqdci; // dwdot[O]/d[H2O2]
-  J[75] += dqdci; // dwdot[OH]/d[H2O2]
-  J[76] += dqdci; // dwdot[HO2]/d[H2O2]
+  J[47] -= dqdci; // dwdot[O]/d[H2O2]
+  J[57] += dqdci; // dwdot[OH]/d[H2O2]
+  J[67] += dqdci; // dwdot[HO2]/d[H2O2]
   J[77] -= dqdci; // dwdot[H2O2]/d[H2O2]
   // d()/dT
-  J[94] -= dqdT; // dwdot[O]/dT
-  J[95] += dqdT; // dwdot[OH]/dT
-  J[96] += dqdT; // dwdot[HO2]/dT
-  J[97] -= dqdT; // dwdot[H2O2]/dT
+  J[49] -= dqdT; // dwdot[O]/dT
+  J[59] += dqdT; // dwdot[OH]/dT
+  J[69] += dqdT; // dwdot[HO2]/dT
+  J[79] -= dqdT; // dwdot[H2O2]/dT
 
   // reaction 19: H2O2 + OH <=> H2O + HO2
   // a non-third-body and non-pressure-fall-off reaction
@@ -3889,32 +3889,32 @@ aJacobian_precond(
   // d()/d[H2O]
   dqdci = -k_r * sc[6];
   J[22] += dqdci; // dwdot[H2O]/d[H2O]
-  J[25] -= dqdci; // dwdot[OH]/d[H2O]
-  J[26] += dqdci; // dwdot[HO2]/d[H2O]
-  J[27] -= dqdci; // dwdot[H2O2]/d[H2O]
+  J[52] -= dqdci; // dwdot[OH]/d[H2O]
+  J[62] += dqdci; // dwdot[HO2]/d[H2O]
+  J[72] -= dqdci; // dwdot[H2O2]/d[H2O]
   // d()/d[OH]
   dqdci = +k_f * sc[7];
-  J[52] += dqdci; // dwdot[H2O]/d[OH]
+  J[25] += dqdci; // dwdot[H2O]/d[OH]
   J[55] -= dqdci; // dwdot[OH]/d[OH]
-  J[56] += dqdci; // dwdot[HO2]/d[OH]
-  J[57] -= dqdci; // dwdot[H2O2]/d[OH]
+  J[65] += dqdci; // dwdot[HO2]/d[OH]
+  J[75] -= dqdci; // dwdot[H2O2]/d[OH]
   // d()/d[HO2]
   dqdci = -k_r * sc[2];
-  J[62] += dqdci; // dwdot[H2O]/d[HO2]
-  J[65] -= dqdci; // dwdot[OH]/d[HO2]
+  J[26] += dqdci; // dwdot[H2O]/d[HO2]
+  J[56] -= dqdci; // dwdot[OH]/d[HO2]
   J[66] += dqdci; // dwdot[HO2]/d[HO2]
-  J[67] -= dqdci; // dwdot[H2O2]/d[HO2]
+  J[76] -= dqdci; // dwdot[H2O2]/d[HO2]
   // d()/d[H2O2]
   dqdci = +k_f * sc[5];
-  J[72] += dqdci; // dwdot[H2O]/d[H2O2]
-  J[75] -= dqdci; // dwdot[OH]/d[H2O2]
-  J[76] += dqdci; // dwdot[HO2]/d[H2O2]
+  J[27] += dqdci; // dwdot[H2O]/d[H2O2]
+  J[57] -= dqdci; // dwdot[OH]/d[H2O2]
+  J[67] += dqdci; // dwdot[HO2]/d[H2O2]
   J[77] -= dqdci; // dwdot[H2O2]/d[H2O2]
   // d()/dT
-  J[92] += dqdT; // dwdot[H2O]/dT
-  J[95] -= dqdT; // dwdot[OH]/dT
-  J[96] += dqdT; // dwdot[HO2]/dT
-  J[97] -= dqdT; // dwdot[H2O2]/dT
+  J[29] += dqdT; // dwdot[H2O]/dT
+  J[59] -= dqdT; // dwdot[OH]/dT
+  J[69] += dqdT; // dwdot[HO2]/dT
+  J[79] -= dqdT; // dwdot[H2O2]/dT
 
   // reaction 20: H2O2 + OH <=> H2O + HO2
   // a non-third-body and non-pressure-fall-off reaction
@@ -3939,32 +3939,32 @@ aJacobian_precond(
   // d()/d[H2O]
   dqdci = -k_r * sc[6];
   J[22] += dqdci; // dwdot[H2O]/d[H2O]
-  J[25] -= dqdci; // dwdot[OH]/d[H2O]
-  J[26] += dqdci; // dwdot[HO2]/d[H2O]
-  J[27] -= dqdci; // dwdot[H2O2]/d[H2O]
+  J[52] -= dqdci; // dwdot[OH]/d[H2O]
+  J[62] += dqdci; // dwdot[HO2]/d[H2O]
+  J[72] -= dqdci; // dwdot[H2O2]/d[H2O]
   // d()/d[OH]
   dqdci = +k_f * sc[7];
-  J[52] += dqdci; // dwdot[H2O]/d[OH]
+  J[25] += dqdci; // dwdot[H2O]/d[OH]
   J[55] -= dqdci; // dwdot[OH]/d[OH]
-  J[56] += dqdci; // dwdot[HO2]/d[OH]
-  J[57] -= dqdci; // dwdot[H2O2]/d[OH]
+  J[65] += dqdci; // dwdot[HO2]/d[OH]
+  J[75] -= dqdci; // dwdot[H2O2]/d[OH]
   // d()/d[HO2]
   dqdci = -k_r * sc[2];
-  J[62] += dqdci; // dwdot[H2O]/d[HO2]
-  J[65] -= dqdci; // dwdot[OH]/d[HO2]
+  J[26] += dqdci; // dwdot[H2O]/d[HO2]
+  J[56] -= dqdci; // dwdot[OH]/d[HO2]
   J[66] += dqdci; // dwdot[HO2]/d[HO2]
-  J[67] -= dqdci; // dwdot[H2O2]/d[HO2]
+  J[76] -= dqdci; // dwdot[H2O2]/d[HO2]
   // d()/d[H2O2]
   dqdci = +k_f * sc[5];
-  J[72] += dqdci; // dwdot[H2O]/d[H2O2]
-  J[75] -= dqdci; // dwdot[OH]/d[H2O2]
-  J[76] += dqdci; // dwdot[HO2]/d[H2O2]
+  J[27] += dqdci; // dwdot[H2O]/d[H2O2]
+  J[57] -= dqdci; // dwdot[OH]/d[H2O2]
+  J[67] += dqdci; // dwdot[HO2]/d[H2O2]
   J[77] -= dqdci; // dwdot[H2O2]/d[H2O2]
   // d()/dT
-  J[92] += dqdT; // dwdot[H2O]/dT
-  J[95] -= dqdT; // dwdot[OH]/dT
-  J[96] += dqdT; // dwdot[HO2]/dT
-  J[97] -= dqdT; // dwdot[H2O2]/dT
+  J[29] += dqdT; // dwdot[H2O]/dT
+  J[59] -= dqdT; // dwdot[OH]/dT
+  J[69] += dqdT; // dwdot[HO2]/dT
+  J[79] -= dqdT; // dwdot[H2O2]/dT
 
   amrex::Real c_R[9], dcRdT[9], e_RT[9];
   amrex::Real* eh_RT;
@@ -3984,7 +3984,7 @@ aJacobian_precond(
     cmix += c_R[k] * sc[k];
     dcmixdT += dcRdT[k] * sc[k];
     ehmix += eh_RT[k] * wdot[k];
-    dehmixdT += invT * (c_R[k] - eh_RT[k]) * wdot[k] + eh_RT[k] * J[90 + k];
+    dehmixdT += invT * (c_R[k] - eh_RT[k]) * wdot[k] + eh_RT[k] * J[k * 10 + 9];
   }
 
   amrex::Real cmixinv = 1.0 / cmix;
@@ -3996,9 +3996,9 @@ aJacobian_precond(
   for (int k = 0; k < 9; ++k) {
     dehmixdc = 0.0;
     for (int m = 0; m < 9; ++m) {
-      dehmixdc += eh_RT[m] * J[k * 10 + m];
+      dehmixdc += eh_RT[m] * J[m * 10 + k];
     }
-    J[k * 10 + 9] = tmp2 * c_R[k] - tmp3 * dehmixdc;
+    J[90 + k] = tmp2 * c_R[k] - tmp3 * dehmixdc;
   }
   // dTdot/dT
   J[99] = -tmp1 + tmp2 * dcmixdT - tmp3 * dehmixdT;
@@ -4009,7 +4009,7 @@ aJacobian_precond(
 
 // compute an approx to the reaction Jacobian (for preconditioning)
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void
-DWDOT_SIMPLIFIED(
+DWDOT_SIMPLIFIED_ROLL(
   amrex::Real* J, const amrex::Real* sc, const amrex::Real* Tp, const int* HP)
 {
   amrex::Real c[9];
@@ -4018,19 +4018,19 @@ DWDOT_SIMPLIFIED(
     c[k] = 1.e6 * sc[k];
   }
 
-  aJacobian_precond(J, c, *Tp, *HP);
+  aJacobian_precond_roll(J, c, *Tp, *HP);
 
   // dwdot[k]/dT
   // dTdot/d[X]
   for (int k = 0; k < 9; k++) {
-    J[90 + k] *= 1.e-6;
-    J[k * 10 + 9] *= 1.e6;
+    J[k * 10 + 9] *= 1.e-6;
+    J[90 + k] *= 1.e6;
   }
 }
 
 // compute the reaction Jacobian
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void
-aJacobian(
+aJacobian_roll(
   amrex::Real* J, const amrex::Real* sc, const amrex::Real T, const int consP)
 {
 
@@ -4135,28 +4135,28 @@ aJacobian(
   if (consP == 1) {
     // d()/d[H2]
     dqdci = (2 - 1) * dcdc_fac;
-    J[1] -= dqdci; // dwdot[O2]/d[H2]
-    J[3] -= dqdci; // dwdot[H]/d[H2]
-    J[6] += dqdci; // dwdot[HO2]/d[H2]
+    J[10] -= dqdci; // dwdot[O2]/d[H2]
+    J[30] -= dqdci; // dwdot[H]/d[H2]
+    J[60] += dqdci; // dwdot[HO2]/d[H2]
     // d()/d[O2]
     dqdci = (0.78 - 1) * dcdc_fac + k_f * sc[3];
     J[11] -= dqdci; // dwdot[O2]/d[O2]
-    J[13] -= dqdci; // dwdot[H]/d[O2]
-    J[16] += dqdci; // dwdot[HO2]/d[O2]
+    J[31] -= dqdci; // dwdot[H]/d[O2]
+    J[61] += dqdci; // dwdot[HO2]/d[O2]
     // d()/d[H2O]
     dqdci = (11 - 1) * dcdc_fac;
-    J[21] -= dqdci; // dwdot[O2]/d[H2O]
-    J[23] -= dqdci; // dwdot[H]/d[H2O]
-    J[26] += dqdci; // dwdot[HO2]/d[H2O]
+    J[12] -= dqdci; // dwdot[O2]/d[H2O]
+    J[32] -= dqdci; // dwdot[H]/d[H2O]
+    J[62] += dqdci; // dwdot[HO2]/d[H2O]
     // d()/d[H]
     dqdci = +k_f * sc[1];
-    J[31] -= dqdci; // dwdot[O2]/d[H]
+    J[13] -= dqdci; // dwdot[O2]/d[H]
     J[33] -= dqdci; // dwdot[H]/d[H]
-    J[36] += dqdci; // dwdot[HO2]/d[H]
+    J[63] += dqdci; // dwdot[HO2]/d[H]
     // d()/d[HO2]
     dqdci = -k_r;
-    J[61] -= dqdci; // dwdot[O2]/d[HO2]
-    J[63] -= dqdci; // dwdot[H]/d[HO2]
+    J[16] -= dqdci; // dwdot[O2]/d[HO2]
+    J[36] -= dqdci; // dwdot[H]/d[HO2]
     J[66] += dqdci; // dwdot[HO2]/d[HO2]
   } else {
     dqdc[0] = 2 * dcdc_fac;
@@ -4169,14 +4169,14 @@ aJacobian(
     dqdc[7] = dcdc_fac;
     dqdc[8] = dcdc_fac;
     for (int k = 0; k < 9; k++) {
-      J[10 * k + 1] -= dqdc[k];
-      J[10 * k + 3] -= dqdc[k];
-      J[10 * k + 6] += dqdc[k];
+      J[10 + k] -= dqdc[k];
+      J[30 + k] -= dqdc[k];
+      J[60 + k] += dqdc[k];
     }
   }
-  J[91] -= dqdT; // dwdot[O2]/dT
-  J[93] -= dqdT; // dwdot[H]/dT
-  J[96] += dqdT; // dwdot[HO2]/dT
+  J[19] -= dqdT; // dwdot[O2]/dT
+  J[39] -= dqdT; // dwdot[H]/dT
+  J[69] += dqdT; // dwdot[HO2]/dT
 
   // reaction 15: H2O2 (+M) <=> 2 OH (+M)
   // a third-body and pressure-fall-off reaction
@@ -4235,19 +4235,19 @@ aJacobian(
   if (consP == 1) {
     // d()/d[H2]
     dqdci = (2.5 - 1) * dcdc_fac;
-    J[5] += 2 * dqdci; // dwdot[OH]/d[H2]
-    J[7] -= dqdci;     // dwdot[H2O2]/d[H2]
+    J[50] += 2 * dqdci; // dwdot[OH]/d[H2]
+    J[70] -= dqdci;     // dwdot[H2O2]/d[H2]
     // d()/d[H2O]
     dqdci = (12 - 1) * dcdc_fac;
-    J[25] += 2 * dqdci; // dwdot[OH]/d[H2O]
-    J[27] -= dqdci;     // dwdot[H2O2]/d[H2O]
+    J[52] += 2 * dqdci; // dwdot[OH]/d[H2O]
+    J[72] -= dqdci;     // dwdot[H2O2]/d[H2O]
     // d()/d[OH]
     dqdci = -k_r * 2.000000 * sc[5];
     J[55] += 2 * dqdci; // dwdot[OH]/d[OH]
-    J[57] -= dqdci;     // dwdot[H2O2]/d[OH]
+    J[75] -= dqdci;     // dwdot[H2O2]/d[OH]
     // d()/d[H2O2]
     dqdci = +k_f;
-    J[75] += 2 * dqdci; // dwdot[OH]/d[H2O2]
+    J[57] += 2 * dqdci; // dwdot[OH]/d[H2O2]
     J[77] -= dqdci;     // dwdot[H2O2]/d[H2O2]
   } else {
     dqdc[0] = 2.5 * dcdc_fac;
@@ -4260,12 +4260,12 @@ aJacobian(
     dqdc[7] = dcdc_fac + k_f;
     dqdc[8] = dcdc_fac;
     for (int k = 0; k < 9; k++) {
-      J[10 * k + 5] += 2 * dqdc[k];
-      J[10 * k + 7] -= dqdc[k];
+      J[50 + k] += 2 * dqdc[k];
+      J[70 + k] -= dqdc[k];
     }
   }
-  J[95] += 2 * dqdT; // dwdot[OH]/dT
-  J[97] -= dqdT;     // dwdot[H2O2]/dT
+  J[59] += 2 * dqdT; // dwdot[OH]/dT
+  J[79] -= dqdT;     // dwdot[H2O2]/dT
 
   // reaction 4: H2 + M <=> 2 H + M
   // a third-body and non-pressure-fall-off reaction
@@ -4294,15 +4294,15 @@ aJacobian(
   if (consP == 1) {
     // d()/d[H2]
     dqdci = (2.5 - 1) * q_nocor + k_f;
-    J[0] -= dqdci;     // dwdot[H2]/d[H2]
-    J[3] += 2 * dqdci; // dwdot[H]/d[H2]
+    J[0] -= dqdci;      // dwdot[H2]/d[H2]
+    J[30] += 2 * dqdci; // dwdot[H]/d[H2]
     // d()/d[H2O]
     dqdci = (12 - 1) * q_nocor;
-    J[20] -= dqdci;     // dwdot[H2]/d[H2O]
-    J[23] += 2 * dqdci; // dwdot[H]/d[H2O]
+    J[2] -= dqdci;      // dwdot[H2]/d[H2O]
+    J[32] += 2 * dqdci; // dwdot[H]/d[H2O]
     // d()/d[H]
     dqdci = -k_r * 2.000000 * sc[3];
-    J[30] -= dqdci;     // dwdot[H2]/d[H]
+    J[3] -= dqdci;      // dwdot[H2]/d[H]
     J[33] += 2 * dqdci; // dwdot[H]/d[H]
   } else {
     dqdc[0] = 2.5 * q_nocor + k_f;
@@ -4315,12 +4315,12 @@ aJacobian(
     dqdc[7] = q_nocor;
     dqdc[8] = q_nocor;
     for (int k = 0; k < 9; k++) {
-      J[10 * k + 0] -= dqdc[k];
-      J[10 * k + 3] += 2 * dqdc[k];
+      J[0 + k] -= dqdc[k];
+      J[30 + k] += 2 * dqdc[k];
     }
   }
-  J[90] -= dqdT;     // dwdot[H2]/dT
-  J[93] += 2 * dqdT; // dwdot[H]/dT
+  J[9] -= dqdT;      // dwdot[H2]/dT
+  J[39] += 2 * dqdT; // dwdot[H]/dT
 
   // reaction 5: 2 O + M <=> O2 + M
   // a third-body and non-pressure-fall-off reaction
@@ -4349,19 +4349,19 @@ aJacobian(
   if (consP == 1) {
     // d()/d[H2]
     dqdci = (2.5 - 1) * q_nocor;
-    J[1] += dqdci;      // dwdot[O2]/d[H2]
-    J[4] += -2 * dqdci; // dwdot[O]/d[H2]
+    J[10] += dqdci;      // dwdot[O2]/d[H2]
+    J[40] += -2 * dqdci; // dwdot[O]/d[H2]
     // d()/d[O2]
     dqdci = -k_r;
     J[11] += dqdci;      // dwdot[O2]/d[O2]
-    J[14] += -2 * dqdci; // dwdot[O]/d[O2]
+    J[41] += -2 * dqdci; // dwdot[O]/d[O2]
     // d()/d[H2O]
     dqdci = (12 - 1) * q_nocor;
-    J[21] += dqdci;      // dwdot[O2]/d[H2O]
-    J[24] += -2 * dqdci; // dwdot[O]/d[H2O]
+    J[12] += dqdci;      // dwdot[O2]/d[H2O]
+    J[42] += -2 * dqdci; // dwdot[O]/d[H2O]
     // d()/d[O]
     dqdci = +k_f * 2.000000 * sc[4];
-    J[41] += dqdci;      // dwdot[O2]/d[O]
+    J[14] += dqdci;      // dwdot[O2]/d[O]
     J[44] += -2 * dqdci; // dwdot[O]/d[O]
   } else {
     dqdc[0] = 2.5 * q_nocor;
@@ -4374,12 +4374,12 @@ aJacobian(
     dqdc[7] = q_nocor;
     dqdc[8] = q_nocor;
     for (int k = 0; k < 9; k++) {
-      J[10 * k + 1] += dqdc[k];
-      J[10 * k + 4] += -2 * dqdc[k];
+      J[10 + k] += dqdc[k];
+      J[40 + k] += -2 * dqdc[k];
     }
   }
-  J[91] += dqdT;      // dwdot[O2]/dT
-  J[94] += -2 * dqdT; // dwdot[O]/dT
+  J[19] += dqdT;      // dwdot[O2]/dT
+  J[49] += -2 * dqdT; // dwdot[O]/dT
 
   // reaction 6: H + O + M <=> OH + M
   // a third-body and non-pressure-fall-off reaction
@@ -4409,28 +4409,28 @@ aJacobian(
   if (consP == 1) {
     // d()/d[H2]
     dqdci = (2.5 - 1) * q_nocor;
-    J[3] -= dqdci; // dwdot[H]/d[H2]
-    J[4] -= dqdci; // dwdot[O]/d[H2]
-    J[5] += dqdci; // dwdot[OH]/d[H2]
+    J[30] -= dqdci; // dwdot[H]/d[H2]
+    J[40] -= dqdci; // dwdot[O]/d[H2]
+    J[50] += dqdci; // dwdot[OH]/d[H2]
     // d()/d[H2O]
     dqdci = (12 - 1) * q_nocor;
-    J[23] -= dqdci; // dwdot[H]/d[H2O]
-    J[24] -= dqdci; // dwdot[O]/d[H2O]
-    J[25] += dqdci; // dwdot[OH]/d[H2O]
+    J[32] -= dqdci; // dwdot[H]/d[H2O]
+    J[42] -= dqdci; // dwdot[O]/d[H2O]
+    J[52] += dqdci; // dwdot[OH]/d[H2O]
     // d()/d[H]
     dqdci = +k_f * sc[4];
     J[33] -= dqdci; // dwdot[H]/d[H]
-    J[34] -= dqdci; // dwdot[O]/d[H]
-    J[35] += dqdci; // dwdot[OH]/d[H]
+    J[43] -= dqdci; // dwdot[O]/d[H]
+    J[53] += dqdci; // dwdot[OH]/d[H]
     // d()/d[O]
     dqdci = +k_f * sc[3];
-    J[43] -= dqdci; // dwdot[H]/d[O]
+    J[34] -= dqdci; // dwdot[H]/d[O]
     J[44] -= dqdci; // dwdot[O]/d[O]
-    J[45] += dqdci; // dwdot[OH]/d[O]
+    J[54] += dqdci; // dwdot[OH]/d[O]
     // d()/d[OH]
     dqdci = -k_r;
-    J[53] -= dqdci; // dwdot[H]/d[OH]
-    J[54] -= dqdci; // dwdot[O]/d[OH]
+    J[35] -= dqdci; // dwdot[H]/d[OH]
+    J[45] -= dqdci; // dwdot[O]/d[OH]
     J[55] += dqdci; // dwdot[OH]/d[OH]
   } else {
     dqdc[0] = 2.5 * q_nocor;
@@ -4443,14 +4443,14 @@ aJacobian(
     dqdc[7] = q_nocor;
     dqdc[8] = q_nocor;
     for (int k = 0; k < 9; k++) {
-      J[10 * k + 3] -= dqdc[k];
-      J[10 * k + 4] -= dqdc[k];
-      J[10 * k + 5] += dqdc[k];
+      J[30 + k] -= dqdc[k];
+      J[40 + k] -= dqdc[k];
+      J[50 + k] += dqdc[k];
     }
   }
-  J[93] -= dqdT; // dwdot[H]/dT
-  J[94] -= dqdT; // dwdot[O]/dT
-  J[95] += dqdT; // dwdot[OH]/dT
+  J[39] -= dqdT; // dwdot[H]/dT
+  J[49] -= dqdT; // dwdot[O]/dT
+  J[59] += dqdT; // dwdot[OH]/dT
 
   // reaction 7: H + OH + M <=> H2O + M
   // a third-body and non-pressure-fall-off reaction
@@ -4480,23 +4480,23 @@ aJacobian(
   if (consP == 1) {
     // d()/d[H2]
     dqdci = (2.5 - 1) * q_nocor;
-    J[2] += dqdci; // dwdot[H2O]/d[H2]
-    J[3] -= dqdci; // dwdot[H]/d[H2]
-    J[5] -= dqdci; // dwdot[OH]/d[H2]
+    J[20] += dqdci; // dwdot[H2O]/d[H2]
+    J[30] -= dqdci; // dwdot[H]/d[H2]
+    J[50] -= dqdci; // dwdot[OH]/d[H2]
     // d()/d[H2O]
     dqdci = (12 - 1) * q_nocor - k_r;
     J[22] += dqdci; // dwdot[H2O]/d[H2O]
-    J[23] -= dqdci; // dwdot[H]/d[H2O]
-    J[25] -= dqdci; // dwdot[OH]/d[H2O]
+    J[32] -= dqdci; // dwdot[H]/d[H2O]
+    J[52] -= dqdci; // dwdot[OH]/d[H2O]
     // d()/d[H]
     dqdci = +k_f * sc[5];
-    J[32] += dqdci; // dwdot[H2O]/d[H]
+    J[23] += dqdci; // dwdot[H2O]/d[H]
     J[33] -= dqdci; // dwdot[H]/d[H]
-    J[35] -= dqdci; // dwdot[OH]/d[H]
+    J[53] -= dqdci; // dwdot[OH]/d[H]
     // d()/d[OH]
     dqdci = +k_f * sc[3];
-    J[52] += dqdci; // dwdot[H2O]/d[OH]
-    J[53] -= dqdci; // dwdot[H]/d[OH]
+    J[25] += dqdci; // dwdot[H2O]/d[OH]
+    J[35] -= dqdci; // dwdot[H]/d[OH]
     J[55] -= dqdci; // dwdot[OH]/d[OH]
   } else {
     dqdc[0] = 2.5 * q_nocor;
@@ -4509,14 +4509,14 @@ aJacobian(
     dqdc[7] = q_nocor;
     dqdc[8] = q_nocor;
     for (int k = 0; k < 9; k++) {
-      J[10 * k + 2] += dqdc[k];
-      J[10 * k + 3] -= dqdc[k];
-      J[10 * k + 5] -= dqdc[k];
+      J[20 + k] += dqdc[k];
+      J[30 + k] -= dqdc[k];
+      J[50 + k] -= dqdc[k];
     }
   }
-  J[92] += dqdT; // dwdot[H2O]/dT
-  J[93] -= dqdT; // dwdot[H]/dT
-  J[95] -= dqdT; // dwdot[OH]/dT
+  J[29] += dqdT; // dwdot[H2O]/dT
+  J[39] -= dqdT; // dwdot[H]/dT
+  J[59] -= dqdT; // dwdot[OH]/dT
 
   // reaction 0: H + O2 <=> O + OH
   // a non-third-body and non-pressure-fall-off reaction
@@ -4541,32 +4541,32 @@ aJacobian(
   // d()/d[O2]
   dqdci = +k_f * sc[3];
   J[11] -= dqdci; // dwdot[O2]/d[O2]
-  J[13] -= dqdci; // dwdot[H]/d[O2]
-  J[14] += dqdci; // dwdot[O]/d[O2]
-  J[15] += dqdci; // dwdot[OH]/d[O2]
+  J[31] -= dqdci; // dwdot[H]/d[O2]
+  J[41] += dqdci; // dwdot[O]/d[O2]
+  J[51] += dqdci; // dwdot[OH]/d[O2]
   // d()/d[H]
   dqdci = +k_f * sc[1];
-  J[31] -= dqdci; // dwdot[O2]/d[H]
+  J[13] -= dqdci; // dwdot[O2]/d[H]
   J[33] -= dqdci; // dwdot[H]/d[H]
-  J[34] += dqdci; // dwdot[O]/d[H]
-  J[35] += dqdci; // dwdot[OH]/d[H]
+  J[43] += dqdci; // dwdot[O]/d[H]
+  J[53] += dqdci; // dwdot[OH]/d[H]
   // d()/d[O]
   dqdci = -k_r * sc[5];
-  J[41] -= dqdci; // dwdot[O2]/d[O]
-  J[43] -= dqdci; // dwdot[H]/d[O]
+  J[14] -= dqdci; // dwdot[O2]/d[O]
+  J[34] -= dqdci; // dwdot[H]/d[O]
   J[44] += dqdci; // dwdot[O]/d[O]
-  J[45] += dqdci; // dwdot[OH]/d[O]
+  J[54] += dqdci; // dwdot[OH]/d[O]
   // d()/d[OH]
   dqdci = -k_r * sc[4];
-  J[51] -= dqdci; // dwdot[O2]/d[OH]
-  J[53] -= dqdci; // dwdot[H]/d[OH]
-  J[54] += dqdci; // dwdot[O]/d[OH]
+  J[15] -= dqdci; // dwdot[O2]/d[OH]
+  J[35] -= dqdci; // dwdot[H]/d[OH]
+  J[45] += dqdci; // dwdot[O]/d[OH]
   J[55] += dqdci; // dwdot[OH]/d[OH]
   // d()/dT
-  J[91] -= dqdT; // dwdot[O2]/dT
-  J[93] -= dqdT; // dwdot[H]/dT
-  J[94] += dqdT; // dwdot[O]/dT
-  J[95] += dqdT; // dwdot[OH]/dT
+  J[19] -= dqdT; // dwdot[O2]/dT
+  J[39] -= dqdT; // dwdot[H]/dT
+  J[49] += dqdT; // dwdot[O]/dT
+  J[59] += dqdT; // dwdot[OH]/dT
 
   // reaction 1: H2 + O <=> H + OH
   // a non-third-body and non-pressure-fall-off reaction
@@ -4590,33 +4590,33 @@ aJacobian(
   wdot[5] += q; // OH
   // d()/d[H2]
   dqdci = +k_f * sc[4];
-  J[0] -= dqdci; // dwdot[H2]/d[H2]
-  J[3] += dqdci; // dwdot[H]/d[H2]
-  J[4] -= dqdci; // dwdot[O]/d[H2]
-  J[5] += dqdci; // dwdot[OH]/d[H2]
+  J[0] -= dqdci;  // dwdot[H2]/d[H2]
+  J[30] += dqdci; // dwdot[H]/d[H2]
+  J[40] -= dqdci; // dwdot[O]/d[H2]
+  J[50] += dqdci; // dwdot[OH]/d[H2]
   // d()/d[H]
   dqdci = -k_r * sc[5];
-  J[30] -= dqdci; // dwdot[H2]/d[H]
+  J[3] -= dqdci;  // dwdot[H2]/d[H]
   J[33] += dqdci; // dwdot[H]/d[H]
-  J[34] -= dqdci; // dwdot[O]/d[H]
-  J[35] += dqdci; // dwdot[OH]/d[H]
+  J[43] -= dqdci; // dwdot[O]/d[H]
+  J[53] += dqdci; // dwdot[OH]/d[H]
   // d()/d[O]
   dqdci = +k_f * sc[0];
-  J[40] -= dqdci; // dwdot[H2]/d[O]
-  J[43] += dqdci; // dwdot[H]/d[O]
+  J[4] -= dqdci;  // dwdot[H2]/d[O]
+  J[34] += dqdci; // dwdot[H]/d[O]
   J[44] -= dqdci; // dwdot[O]/d[O]
-  J[45] += dqdci; // dwdot[OH]/d[O]
+  J[54] += dqdci; // dwdot[OH]/d[O]
   // d()/d[OH]
   dqdci = -k_r * sc[3];
-  J[50] -= dqdci; // dwdot[H2]/d[OH]
-  J[53] += dqdci; // dwdot[H]/d[OH]
-  J[54] -= dqdci; // dwdot[O]/d[OH]
+  J[5] -= dqdci;  // dwdot[H2]/d[OH]
+  J[35] += dqdci; // dwdot[H]/d[OH]
+  J[45] -= dqdci; // dwdot[O]/d[OH]
   J[55] += dqdci; // dwdot[OH]/d[OH]
   // d()/dT
-  J[90] -= dqdT; // dwdot[H2]/dT
-  J[93] += dqdT; // dwdot[H]/dT
-  J[94] -= dqdT; // dwdot[O]/dT
-  J[95] += dqdT; // dwdot[OH]/dT
+  J[9] -= dqdT;  // dwdot[H2]/dT
+  J[39] += dqdT; // dwdot[H]/dT
+  J[49] -= dqdT; // dwdot[O]/dT
+  J[59] += dqdT; // dwdot[OH]/dT
 
   // reaction 2: H2 + OH <=> H + H2O
   // a non-third-body and non-pressure-fall-off reaction
@@ -4640,33 +4640,33 @@ aJacobian(
   wdot[5] -= q; // OH
   // d()/d[H2]
   dqdci = +k_f * sc[5];
-  J[0] -= dqdci; // dwdot[H2]/d[H2]
-  J[2] += dqdci; // dwdot[H2O]/d[H2]
-  J[3] += dqdci; // dwdot[H]/d[H2]
-  J[5] -= dqdci; // dwdot[OH]/d[H2]
+  J[0] -= dqdci;  // dwdot[H2]/d[H2]
+  J[20] += dqdci; // dwdot[H2O]/d[H2]
+  J[30] += dqdci; // dwdot[H]/d[H2]
+  J[50] -= dqdci; // dwdot[OH]/d[H2]
   // d()/d[H2O]
   dqdci = -k_r * sc[3];
-  J[20] -= dqdci; // dwdot[H2]/d[H2O]
+  J[2] -= dqdci;  // dwdot[H2]/d[H2O]
   J[22] += dqdci; // dwdot[H2O]/d[H2O]
-  J[23] += dqdci; // dwdot[H]/d[H2O]
-  J[25] -= dqdci; // dwdot[OH]/d[H2O]
+  J[32] += dqdci; // dwdot[H]/d[H2O]
+  J[52] -= dqdci; // dwdot[OH]/d[H2O]
   // d()/d[H]
   dqdci = -k_r * sc[2];
-  J[30] -= dqdci; // dwdot[H2]/d[H]
-  J[32] += dqdci; // dwdot[H2O]/d[H]
+  J[3] -= dqdci;  // dwdot[H2]/d[H]
+  J[23] += dqdci; // dwdot[H2O]/d[H]
   J[33] += dqdci; // dwdot[H]/d[H]
-  J[35] -= dqdci; // dwdot[OH]/d[H]
+  J[53] -= dqdci; // dwdot[OH]/d[H]
   // d()/d[OH]
   dqdci = +k_f * sc[0];
-  J[50] -= dqdci; // dwdot[H2]/d[OH]
-  J[52] += dqdci; // dwdot[H2O]/d[OH]
-  J[53] += dqdci; // dwdot[H]/d[OH]
+  J[5] -= dqdci;  // dwdot[H2]/d[OH]
+  J[25] += dqdci; // dwdot[H2O]/d[OH]
+  J[35] += dqdci; // dwdot[H]/d[OH]
   J[55] -= dqdci; // dwdot[OH]/d[OH]
   // d()/dT
-  J[90] -= dqdT; // dwdot[H2]/dT
-  J[92] += dqdT; // dwdot[H2O]/dT
-  J[93] += dqdT; // dwdot[H]/dT
-  J[95] -= dqdT; // dwdot[OH]/dT
+  J[9] -= dqdT;  // dwdot[H2]/dT
+  J[29] += dqdT; // dwdot[H2O]/dT
+  J[39] += dqdT; // dwdot[H]/dT
+  J[59] -= dqdT; // dwdot[OH]/dT
 
   // reaction 3: H2O + O <=> 2 OH
   // a non-third-body and non-pressure-fall-off reaction
@@ -4690,22 +4690,22 @@ aJacobian(
   // d()/d[H2O]
   dqdci = +k_f * sc[4];
   J[22] -= dqdci;     // dwdot[H2O]/d[H2O]
-  J[24] -= dqdci;     // dwdot[O]/d[H2O]
-  J[25] += 2 * dqdci; // dwdot[OH]/d[H2O]
+  J[42] -= dqdci;     // dwdot[O]/d[H2O]
+  J[52] += 2 * dqdci; // dwdot[OH]/d[H2O]
   // d()/d[O]
   dqdci = +k_f * sc[2];
-  J[42] -= dqdci;     // dwdot[H2O]/d[O]
+  J[24] -= dqdci;     // dwdot[H2O]/d[O]
   J[44] -= dqdci;     // dwdot[O]/d[O]
-  J[45] += 2 * dqdci; // dwdot[OH]/d[O]
+  J[54] += 2 * dqdci; // dwdot[OH]/d[O]
   // d()/d[OH]
   dqdci = -k_r * 2.000000 * sc[5];
-  J[52] -= dqdci;     // dwdot[H2O]/d[OH]
-  J[54] -= dqdci;     // dwdot[O]/d[OH]
+  J[25] -= dqdci;     // dwdot[H2O]/d[OH]
+  J[45] -= dqdci;     // dwdot[O]/d[OH]
   J[55] += 2 * dqdci; // dwdot[OH]/d[OH]
   // d()/dT
-  J[92] -= dqdT;     // dwdot[H2O]/dT
-  J[94] -= dqdT;     // dwdot[O]/dT
-  J[95] += 2 * dqdT; // dwdot[OH]/dT
+  J[29] -= dqdT;     // dwdot[H2O]/dT
+  J[49] -= dqdT;     // dwdot[O]/dT
+  J[59] += 2 * dqdT; // dwdot[OH]/dT
 
   // reaction 9: H + HO2 <=> H2 + O2
   // a non-third-body and non-pressure-fall-off reaction
@@ -4729,33 +4729,33 @@ aJacobian(
   wdot[6] -= q; // HO2
   // d()/d[H2]
   dqdci = -k_r * sc[1];
-  J[0] += dqdci; // dwdot[H2]/d[H2]
-  J[1] += dqdci; // dwdot[O2]/d[H2]
-  J[3] -= dqdci; // dwdot[H]/d[H2]
-  J[6] -= dqdci; // dwdot[HO2]/d[H2]
+  J[0] += dqdci;  // dwdot[H2]/d[H2]
+  J[10] += dqdci; // dwdot[O2]/d[H2]
+  J[30] -= dqdci; // dwdot[H]/d[H2]
+  J[60] -= dqdci; // dwdot[HO2]/d[H2]
   // d()/d[O2]
   dqdci = -k_r * sc[0];
-  J[10] += dqdci; // dwdot[H2]/d[O2]
+  J[1] += dqdci;  // dwdot[H2]/d[O2]
   J[11] += dqdci; // dwdot[O2]/d[O2]
-  J[13] -= dqdci; // dwdot[H]/d[O2]
-  J[16] -= dqdci; // dwdot[HO2]/d[O2]
+  J[31] -= dqdci; // dwdot[H]/d[O2]
+  J[61] -= dqdci; // dwdot[HO2]/d[O2]
   // d()/d[H]
   dqdci = +k_f * sc[6];
-  J[30] += dqdci; // dwdot[H2]/d[H]
-  J[31] += dqdci; // dwdot[O2]/d[H]
+  J[3] += dqdci;  // dwdot[H2]/d[H]
+  J[13] += dqdci; // dwdot[O2]/d[H]
   J[33] -= dqdci; // dwdot[H]/d[H]
-  J[36] -= dqdci; // dwdot[HO2]/d[H]
+  J[63] -= dqdci; // dwdot[HO2]/d[H]
   // d()/d[HO2]
   dqdci = +k_f * sc[3];
-  J[60] += dqdci; // dwdot[H2]/d[HO2]
-  J[61] += dqdci; // dwdot[O2]/d[HO2]
-  J[63] -= dqdci; // dwdot[H]/d[HO2]
+  J[6] += dqdci;  // dwdot[H2]/d[HO2]
+  J[16] += dqdci; // dwdot[O2]/d[HO2]
+  J[36] -= dqdci; // dwdot[H]/d[HO2]
   J[66] -= dqdci; // dwdot[HO2]/d[HO2]
   // d()/dT
-  J[90] += dqdT; // dwdot[H2]/dT
-  J[91] += dqdT; // dwdot[O2]/dT
-  J[93] -= dqdT; // dwdot[H]/dT
-  J[96] -= dqdT; // dwdot[HO2]/dT
+  J[9] += dqdT;  // dwdot[H2]/dT
+  J[19] += dqdT; // dwdot[O2]/dT
+  J[39] -= dqdT; // dwdot[H]/dT
+  J[69] -= dqdT; // dwdot[HO2]/dT
 
   // reaction 10: H + HO2 <=> 2 OH
   // a non-third-body and non-pressure-fall-off reaction
@@ -4779,22 +4779,22 @@ aJacobian(
   // d()/d[H]
   dqdci = +k_f * sc[6];
   J[33] -= dqdci;     // dwdot[H]/d[H]
-  J[35] += 2 * dqdci; // dwdot[OH]/d[H]
-  J[36] -= dqdci;     // dwdot[HO2]/d[H]
+  J[53] += 2 * dqdci; // dwdot[OH]/d[H]
+  J[63] -= dqdci;     // dwdot[HO2]/d[H]
   // d()/d[OH]
   dqdci = -k_r * 2.000000 * sc[5];
-  J[53] -= dqdci;     // dwdot[H]/d[OH]
+  J[35] -= dqdci;     // dwdot[H]/d[OH]
   J[55] += 2 * dqdci; // dwdot[OH]/d[OH]
-  J[56] -= dqdci;     // dwdot[HO2]/d[OH]
+  J[65] -= dqdci;     // dwdot[HO2]/d[OH]
   // d()/d[HO2]
   dqdci = +k_f * sc[3];
-  J[63] -= dqdci;     // dwdot[H]/d[HO2]
-  J[65] += 2 * dqdci; // dwdot[OH]/d[HO2]
+  J[36] -= dqdci;     // dwdot[H]/d[HO2]
+  J[56] += 2 * dqdci; // dwdot[OH]/d[HO2]
   J[66] -= dqdci;     // dwdot[HO2]/d[HO2]
   // d()/dT
-  J[93] -= dqdT;     // dwdot[H]/dT
-  J[95] += 2 * dqdT; // dwdot[OH]/dT
-  J[96] -= dqdT;     // dwdot[HO2]/dT
+  J[39] -= dqdT;     // dwdot[H]/dT
+  J[59] += 2 * dqdT; // dwdot[OH]/dT
+  J[69] -= dqdT;     // dwdot[HO2]/dT
 
   // reaction 11: HO2 + O <=> O2 + OH
   // a non-third-body and non-pressure-fall-off reaction
@@ -4819,32 +4819,32 @@ aJacobian(
   // d()/d[O2]
   dqdci = -k_r * sc[5];
   J[11] += dqdci; // dwdot[O2]/d[O2]
-  J[14] -= dqdci; // dwdot[O]/d[O2]
-  J[15] += dqdci; // dwdot[OH]/d[O2]
-  J[16] -= dqdci; // dwdot[HO2]/d[O2]
+  J[41] -= dqdci; // dwdot[O]/d[O2]
+  J[51] += dqdci; // dwdot[OH]/d[O2]
+  J[61] -= dqdci; // dwdot[HO2]/d[O2]
   // d()/d[O]
   dqdci = +k_f * sc[6];
-  J[41] += dqdci; // dwdot[O2]/d[O]
+  J[14] += dqdci; // dwdot[O2]/d[O]
   J[44] -= dqdci; // dwdot[O]/d[O]
-  J[45] += dqdci; // dwdot[OH]/d[O]
-  J[46] -= dqdci; // dwdot[HO2]/d[O]
+  J[54] += dqdci; // dwdot[OH]/d[O]
+  J[64] -= dqdci; // dwdot[HO2]/d[O]
   // d()/d[OH]
   dqdci = -k_r * sc[1];
-  J[51] += dqdci; // dwdot[O2]/d[OH]
-  J[54] -= dqdci; // dwdot[O]/d[OH]
+  J[15] += dqdci; // dwdot[O2]/d[OH]
+  J[45] -= dqdci; // dwdot[O]/d[OH]
   J[55] += dqdci; // dwdot[OH]/d[OH]
-  J[56] -= dqdci; // dwdot[HO2]/d[OH]
+  J[65] -= dqdci; // dwdot[HO2]/d[OH]
   // d()/d[HO2]
   dqdci = +k_f * sc[4];
-  J[61] += dqdci; // dwdot[O2]/d[HO2]
-  J[64] -= dqdci; // dwdot[O]/d[HO2]
-  J[65] += dqdci; // dwdot[OH]/d[HO2]
+  J[16] += dqdci; // dwdot[O2]/d[HO2]
+  J[46] -= dqdci; // dwdot[O]/d[HO2]
+  J[56] += dqdci; // dwdot[OH]/d[HO2]
   J[66] -= dqdci; // dwdot[HO2]/d[HO2]
   // d()/dT
-  J[91] += dqdT; // dwdot[O2]/dT
-  J[94] -= dqdT; // dwdot[O]/dT
-  J[95] += dqdT; // dwdot[OH]/dT
-  J[96] -= dqdT; // dwdot[HO2]/dT
+  J[19] += dqdT; // dwdot[O2]/dT
+  J[49] -= dqdT; // dwdot[O]/dT
+  J[59] += dqdT; // dwdot[OH]/dT
+  J[69] -= dqdT; // dwdot[HO2]/dT
 
   // reaction 12: HO2 + OH <=> H2O + O2
   // a non-third-body and non-pressure-fall-off reaction
@@ -4869,32 +4869,32 @@ aJacobian(
   // d()/d[O2]
   dqdci = -k_r * sc[2];
   J[11] += dqdci; // dwdot[O2]/d[O2]
-  J[12] += dqdci; // dwdot[H2O]/d[O2]
-  J[15] -= dqdci; // dwdot[OH]/d[O2]
-  J[16] -= dqdci; // dwdot[HO2]/d[O2]
+  J[21] += dqdci; // dwdot[H2O]/d[O2]
+  J[51] -= dqdci; // dwdot[OH]/d[O2]
+  J[61] -= dqdci; // dwdot[HO2]/d[O2]
   // d()/d[H2O]
   dqdci = -k_r * sc[1];
-  J[21] += dqdci; // dwdot[O2]/d[H2O]
+  J[12] += dqdci; // dwdot[O2]/d[H2O]
   J[22] += dqdci; // dwdot[H2O]/d[H2O]
-  J[25] -= dqdci; // dwdot[OH]/d[H2O]
-  J[26] -= dqdci; // dwdot[HO2]/d[H2O]
+  J[52] -= dqdci; // dwdot[OH]/d[H2O]
+  J[62] -= dqdci; // dwdot[HO2]/d[H2O]
   // d()/d[OH]
   dqdci = +k_f * sc[6];
-  J[51] += dqdci; // dwdot[O2]/d[OH]
-  J[52] += dqdci; // dwdot[H2O]/d[OH]
+  J[15] += dqdci; // dwdot[O2]/d[OH]
+  J[25] += dqdci; // dwdot[H2O]/d[OH]
   J[55] -= dqdci; // dwdot[OH]/d[OH]
-  J[56] -= dqdci; // dwdot[HO2]/d[OH]
+  J[65] -= dqdci; // dwdot[HO2]/d[OH]
   // d()/d[HO2]
   dqdci = +k_f * sc[5];
-  J[61] += dqdci; // dwdot[O2]/d[HO2]
-  J[62] += dqdci; // dwdot[H2O]/d[HO2]
-  J[65] -= dqdci; // dwdot[OH]/d[HO2]
+  J[16] += dqdci; // dwdot[O2]/d[HO2]
+  J[26] += dqdci; // dwdot[H2O]/d[HO2]
+  J[56] -= dqdci; // dwdot[OH]/d[HO2]
   J[66] -= dqdci; // dwdot[HO2]/d[HO2]
   // d()/dT
-  J[91] += dqdT; // dwdot[O2]/dT
-  J[92] += dqdT; // dwdot[H2O]/dT
-  J[95] -= dqdT; // dwdot[OH]/dT
-  J[96] -= dqdT; // dwdot[HO2]/dT
+  J[19] += dqdT; // dwdot[O2]/dT
+  J[29] += dqdT; // dwdot[H2O]/dT
+  J[59] -= dqdT; // dwdot[OH]/dT
+  J[69] -= dqdT; // dwdot[HO2]/dT
 
   // reaction 13: 2 HO2 <=> H2O2 + O2
   // a non-third-body and non-pressure-fall-off reaction
@@ -4918,22 +4918,22 @@ aJacobian(
   // d()/d[O2]
   dqdci = -k_r * sc[7];
   J[11] += dqdci;      // dwdot[O2]/d[O2]
-  J[16] += -2 * dqdci; // dwdot[HO2]/d[O2]
-  J[17] += dqdci;      // dwdot[H2O2]/d[O2]
+  J[61] += -2 * dqdci; // dwdot[HO2]/d[O2]
+  J[71] += dqdci;      // dwdot[H2O2]/d[O2]
   // d()/d[HO2]
   dqdci = +k_f * 2.000000 * sc[6];
-  J[61] += dqdci;      // dwdot[O2]/d[HO2]
+  J[16] += dqdci;      // dwdot[O2]/d[HO2]
   J[66] += -2 * dqdci; // dwdot[HO2]/d[HO2]
-  J[67] += dqdci;      // dwdot[H2O2]/d[HO2]
+  J[76] += dqdci;      // dwdot[H2O2]/d[HO2]
   // d()/d[H2O2]
   dqdci = -k_r * sc[1];
-  J[71] += dqdci;      // dwdot[O2]/d[H2O2]
-  J[76] += -2 * dqdci; // dwdot[HO2]/d[H2O2]
+  J[17] += dqdci;      // dwdot[O2]/d[H2O2]
+  J[67] += -2 * dqdci; // dwdot[HO2]/d[H2O2]
   J[77] += dqdci;      // dwdot[H2O2]/d[H2O2]
   // d()/dT
-  J[91] += dqdT;      // dwdot[O2]/dT
-  J[96] += -2 * dqdT; // dwdot[HO2]/dT
-  J[97] += dqdT;      // dwdot[H2O2]/dT
+  J[19] += dqdT;      // dwdot[O2]/dT
+  J[69] += -2 * dqdT; // dwdot[HO2]/dT
+  J[79] += dqdT;      // dwdot[H2O2]/dT
 
   // reaction 14: 2 HO2 <=> H2O2 + O2
   // a non-third-body and non-pressure-fall-off reaction
@@ -4957,22 +4957,22 @@ aJacobian(
   // d()/d[O2]
   dqdci = -k_r * sc[7];
   J[11] += dqdci;      // dwdot[O2]/d[O2]
-  J[16] += -2 * dqdci; // dwdot[HO2]/d[O2]
-  J[17] += dqdci;      // dwdot[H2O2]/d[O2]
+  J[61] += -2 * dqdci; // dwdot[HO2]/d[O2]
+  J[71] += dqdci;      // dwdot[H2O2]/d[O2]
   // d()/d[HO2]
   dqdci = +k_f * 2.000000 * sc[6];
-  J[61] += dqdci;      // dwdot[O2]/d[HO2]
+  J[16] += dqdci;      // dwdot[O2]/d[HO2]
   J[66] += -2 * dqdci; // dwdot[HO2]/d[HO2]
-  J[67] += dqdci;      // dwdot[H2O2]/d[HO2]
+  J[76] += dqdci;      // dwdot[H2O2]/d[HO2]
   // d()/d[H2O2]
   dqdci = -k_r * sc[1];
-  J[71] += dqdci;      // dwdot[O2]/d[H2O2]
-  J[76] += -2 * dqdci; // dwdot[HO2]/d[H2O2]
+  J[17] += dqdci;      // dwdot[O2]/d[H2O2]
+  J[67] += -2 * dqdci; // dwdot[HO2]/d[H2O2]
   J[77] += dqdci;      // dwdot[H2O2]/d[H2O2]
   // d()/dT
-  J[91] += dqdT;      // dwdot[O2]/dT
-  J[96] += -2 * dqdT; // dwdot[HO2]/dT
-  J[97] += dqdT;      // dwdot[H2O2]/dT
+  J[19] += dqdT;      // dwdot[O2]/dT
+  J[69] += -2 * dqdT; // dwdot[HO2]/dT
+  J[79] += dqdT;      // dwdot[H2O2]/dT
 
   // reaction 16: H + H2O2 <=> H2O + OH
   // a non-third-body and non-pressure-fall-off reaction
@@ -4997,32 +4997,32 @@ aJacobian(
   // d()/d[H2O]
   dqdci = -k_r * sc[5];
   J[22] += dqdci; // dwdot[H2O]/d[H2O]
-  J[23] -= dqdci; // dwdot[H]/d[H2O]
-  J[25] += dqdci; // dwdot[OH]/d[H2O]
-  J[27] -= dqdci; // dwdot[H2O2]/d[H2O]
+  J[32] -= dqdci; // dwdot[H]/d[H2O]
+  J[52] += dqdci; // dwdot[OH]/d[H2O]
+  J[72] -= dqdci; // dwdot[H2O2]/d[H2O]
   // d()/d[H]
   dqdci = +k_f * sc[7];
-  J[32] += dqdci; // dwdot[H2O]/d[H]
+  J[23] += dqdci; // dwdot[H2O]/d[H]
   J[33] -= dqdci; // dwdot[H]/d[H]
-  J[35] += dqdci; // dwdot[OH]/d[H]
-  J[37] -= dqdci; // dwdot[H2O2]/d[H]
+  J[53] += dqdci; // dwdot[OH]/d[H]
+  J[73] -= dqdci; // dwdot[H2O2]/d[H]
   // d()/d[OH]
   dqdci = -k_r * sc[2];
-  J[52] += dqdci; // dwdot[H2O]/d[OH]
-  J[53] -= dqdci; // dwdot[H]/d[OH]
+  J[25] += dqdci; // dwdot[H2O]/d[OH]
+  J[35] -= dqdci; // dwdot[H]/d[OH]
   J[55] += dqdci; // dwdot[OH]/d[OH]
-  J[57] -= dqdci; // dwdot[H2O2]/d[OH]
+  J[75] -= dqdci; // dwdot[H2O2]/d[OH]
   // d()/d[H2O2]
   dqdci = +k_f * sc[3];
-  J[72] += dqdci; // dwdot[H2O]/d[H2O2]
-  J[73] -= dqdci; // dwdot[H]/d[H2O2]
-  J[75] += dqdci; // dwdot[OH]/d[H2O2]
+  J[27] += dqdci; // dwdot[H2O]/d[H2O2]
+  J[37] -= dqdci; // dwdot[H]/d[H2O2]
+  J[57] += dqdci; // dwdot[OH]/d[H2O2]
   J[77] -= dqdci; // dwdot[H2O2]/d[H2O2]
   // d()/dT
-  J[92] += dqdT; // dwdot[H2O]/dT
-  J[93] -= dqdT; // dwdot[H]/dT
-  J[95] += dqdT; // dwdot[OH]/dT
-  J[97] -= dqdT; // dwdot[H2O2]/dT
+  J[29] += dqdT; // dwdot[H2O]/dT
+  J[39] -= dqdT; // dwdot[H]/dT
+  J[59] += dqdT; // dwdot[OH]/dT
+  J[79] -= dqdT; // dwdot[H2O2]/dT
 
   // reaction 17: H + H2O2 <=> H2 + HO2
   // a non-third-body and non-pressure-fall-off reaction
@@ -5046,33 +5046,33 @@ aJacobian(
   wdot[7] -= q; // H2O2
   // d()/d[H2]
   dqdci = -k_r * sc[6];
-  J[0] += dqdci; // dwdot[H2]/d[H2]
-  J[3] -= dqdci; // dwdot[H]/d[H2]
-  J[6] += dqdci; // dwdot[HO2]/d[H2]
-  J[7] -= dqdci; // dwdot[H2O2]/d[H2]
+  J[0] += dqdci;  // dwdot[H2]/d[H2]
+  J[30] -= dqdci; // dwdot[H]/d[H2]
+  J[60] += dqdci; // dwdot[HO2]/d[H2]
+  J[70] -= dqdci; // dwdot[H2O2]/d[H2]
   // d()/d[H]
   dqdci = +k_f * sc[7];
-  J[30] += dqdci; // dwdot[H2]/d[H]
+  J[3] += dqdci;  // dwdot[H2]/d[H]
   J[33] -= dqdci; // dwdot[H]/d[H]
-  J[36] += dqdci; // dwdot[HO2]/d[H]
-  J[37] -= dqdci; // dwdot[H2O2]/d[H]
+  J[63] += dqdci; // dwdot[HO2]/d[H]
+  J[73] -= dqdci; // dwdot[H2O2]/d[H]
   // d()/d[HO2]
   dqdci = -k_r * sc[0];
-  J[60] += dqdci; // dwdot[H2]/d[HO2]
-  J[63] -= dqdci; // dwdot[H]/d[HO2]
+  J[6] += dqdci;  // dwdot[H2]/d[HO2]
+  J[36] -= dqdci; // dwdot[H]/d[HO2]
   J[66] += dqdci; // dwdot[HO2]/d[HO2]
-  J[67] -= dqdci; // dwdot[H2O2]/d[HO2]
+  J[76] -= dqdci; // dwdot[H2O2]/d[HO2]
   // d()/d[H2O2]
   dqdci = +k_f * sc[3];
-  J[70] += dqdci; // dwdot[H2]/d[H2O2]
-  J[73] -= dqdci; // dwdot[H]/d[H2O2]
-  J[76] += dqdci; // dwdot[HO2]/d[H2O2]
+  J[7] += dqdci;  // dwdot[H2]/d[H2O2]
+  J[37] -= dqdci; // dwdot[H]/d[H2O2]
+  J[67] += dqdci; // dwdot[HO2]/d[H2O2]
   J[77] -= dqdci; // dwdot[H2O2]/d[H2O2]
   // d()/dT
-  J[90] += dqdT; // dwdot[H2]/dT
-  J[93] -= dqdT; // dwdot[H]/dT
-  J[96] += dqdT; // dwdot[HO2]/dT
-  J[97] -= dqdT; // dwdot[H2O2]/dT
+  J[9] += dqdT;  // dwdot[H2]/dT
+  J[39] -= dqdT; // dwdot[H]/dT
+  J[69] += dqdT; // dwdot[HO2]/dT
+  J[79] -= dqdT; // dwdot[H2O2]/dT
 
   // reaction 18: H2O2 + O <=> HO2 + OH
   // a non-third-body and non-pressure-fall-off reaction
@@ -5097,32 +5097,32 @@ aJacobian(
   // d()/d[O]
   dqdci = +k_f * sc[7];
   J[44] -= dqdci; // dwdot[O]/d[O]
-  J[45] += dqdci; // dwdot[OH]/d[O]
-  J[46] += dqdci; // dwdot[HO2]/d[O]
-  J[47] -= dqdci; // dwdot[H2O2]/d[O]
+  J[54] += dqdci; // dwdot[OH]/d[O]
+  J[64] += dqdci; // dwdot[HO2]/d[O]
+  J[74] -= dqdci; // dwdot[H2O2]/d[O]
   // d()/d[OH]
   dqdci = -k_r * sc[6];
-  J[54] -= dqdci; // dwdot[O]/d[OH]
+  J[45] -= dqdci; // dwdot[O]/d[OH]
   J[55] += dqdci; // dwdot[OH]/d[OH]
-  J[56] += dqdci; // dwdot[HO2]/d[OH]
-  J[57] -= dqdci; // dwdot[H2O2]/d[OH]
+  J[65] += dqdci; // dwdot[HO2]/d[OH]
+  J[75] -= dqdci; // dwdot[H2O2]/d[OH]
   // d()/d[HO2]
   dqdci = -k_r * sc[5];
-  J[64] -= dqdci; // dwdot[O]/d[HO2]
-  J[65] += dqdci; // dwdot[OH]/d[HO2]
+  J[46] -= dqdci; // dwdot[O]/d[HO2]
+  J[56] += dqdci; // dwdot[OH]/d[HO2]
   J[66] += dqdci; // dwdot[HO2]/d[HO2]
-  J[67] -= dqdci; // dwdot[H2O2]/d[HO2]
+  J[76] -= dqdci; // dwdot[H2O2]/d[HO2]
   // d()/d[H2O2]
   dqdci = +k_f * sc[4];
-  J[74] -= dqdci; // dwdot[O]/d[H2O2]
-  J[75] += dqdci; // dwdot[OH]/d[H2O2]
-  J[76] += dqdci; // dwdot[HO2]/d[H2O2]
+  J[47] -= dqdci; // dwdot[O]/d[H2O2]
+  J[57] += dqdci; // dwdot[OH]/d[H2O2]
+  J[67] += dqdci; // dwdot[HO2]/d[H2O2]
   J[77] -= dqdci; // dwdot[H2O2]/d[H2O2]
   // d()/dT
-  J[94] -= dqdT; // dwdot[O]/dT
-  J[95] += dqdT; // dwdot[OH]/dT
-  J[96] += dqdT; // dwdot[HO2]/dT
-  J[97] -= dqdT; // dwdot[H2O2]/dT
+  J[49] -= dqdT; // dwdot[O]/dT
+  J[59] += dqdT; // dwdot[OH]/dT
+  J[69] += dqdT; // dwdot[HO2]/dT
+  J[79] -= dqdT; // dwdot[H2O2]/dT
 
   // reaction 19: H2O2 + OH <=> H2O + HO2
   // a non-third-body and non-pressure-fall-off reaction
@@ -5147,32 +5147,32 @@ aJacobian(
   // d()/d[H2O]
   dqdci = -k_r * sc[6];
   J[22] += dqdci; // dwdot[H2O]/d[H2O]
-  J[25] -= dqdci; // dwdot[OH]/d[H2O]
-  J[26] += dqdci; // dwdot[HO2]/d[H2O]
-  J[27] -= dqdci; // dwdot[H2O2]/d[H2O]
+  J[52] -= dqdci; // dwdot[OH]/d[H2O]
+  J[62] += dqdci; // dwdot[HO2]/d[H2O]
+  J[72] -= dqdci; // dwdot[H2O2]/d[H2O]
   // d()/d[OH]
   dqdci = +k_f * sc[7];
-  J[52] += dqdci; // dwdot[H2O]/d[OH]
+  J[25] += dqdci; // dwdot[H2O]/d[OH]
   J[55] -= dqdci; // dwdot[OH]/d[OH]
-  J[56] += dqdci; // dwdot[HO2]/d[OH]
-  J[57] -= dqdci; // dwdot[H2O2]/d[OH]
+  J[65] += dqdci; // dwdot[HO2]/d[OH]
+  J[75] -= dqdci; // dwdot[H2O2]/d[OH]
   // d()/d[HO2]
   dqdci = -k_r * sc[2];
-  J[62] += dqdci; // dwdot[H2O]/d[HO2]
-  J[65] -= dqdci; // dwdot[OH]/d[HO2]
+  J[26] += dqdci; // dwdot[H2O]/d[HO2]
+  J[56] -= dqdci; // dwdot[OH]/d[HO2]
   J[66] += dqdci; // dwdot[HO2]/d[HO2]
-  J[67] -= dqdci; // dwdot[H2O2]/d[HO2]
+  J[76] -= dqdci; // dwdot[H2O2]/d[HO2]
   // d()/d[H2O2]
   dqdci = +k_f * sc[5];
-  J[72] += dqdci; // dwdot[H2O]/d[H2O2]
-  J[75] -= dqdci; // dwdot[OH]/d[H2O2]
-  J[76] += dqdci; // dwdot[HO2]/d[H2O2]
+  J[27] += dqdci; // dwdot[H2O]/d[H2O2]
+  J[57] -= dqdci; // dwdot[OH]/d[H2O2]
+  J[67] += dqdci; // dwdot[HO2]/d[H2O2]
   J[77] -= dqdci; // dwdot[H2O2]/d[H2O2]
   // d()/dT
-  J[92] += dqdT; // dwdot[H2O]/dT
-  J[95] -= dqdT; // dwdot[OH]/dT
-  J[96] += dqdT; // dwdot[HO2]/dT
-  J[97] -= dqdT; // dwdot[H2O2]/dT
+  J[29] += dqdT; // dwdot[H2O]/dT
+  J[59] -= dqdT; // dwdot[OH]/dT
+  J[69] += dqdT; // dwdot[HO2]/dT
+  J[79] -= dqdT; // dwdot[H2O2]/dT
 
   // reaction 20: H2O2 + OH <=> H2O + HO2
   // a non-third-body and non-pressure-fall-off reaction
@@ -5197,32 +5197,32 @@ aJacobian(
   // d()/d[H2O]
   dqdci = -k_r * sc[6];
   J[22] += dqdci; // dwdot[H2O]/d[H2O]
-  J[25] -= dqdci; // dwdot[OH]/d[H2O]
-  J[26] += dqdci; // dwdot[HO2]/d[H2O]
-  J[27] -= dqdci; // dwdot[H2O2]/d[H2O]
+  J[52] -= dqdci; // dwdot[OH]/d[H2O]
+  J[62] += dqdci; // dwdot[HO2]/d[H2O]
+  J[72] -= dqdci; // dwdot[H2O2]/d[H2O]
   // d()/d[OH]
   dqdci = +k_f * sc[7];
-  J[52] += dqdci; // dwdot[H2O]/d[OH]
+  J[25] += dqdci; // dwdot[H2O]/d[OH]
   J[55] -= dqdci; // dwdot[OH]/d[OH]
-  J[56] += dqdci; // dwdot[HO2]/d[OH]
-  J[57] -= dqdci; // dwdot[H2O2]/d[OH]
+  J[65] += dqdci; // dwdot[HO2]/d[OH]
+  J[75] -= dqdci; // dwdot[H2O2]/d[OH]
   // d()/d[HO2]
   dqdci = -k_r * sc[2];
-  J[62] += dqdci; // dwdot[H2O]/d[HO2]
-  J[65] -= dqdci; // dwdot[OH]/d[HO2]
+  J[26] += dqdci; // dwdot[H2O]/d[HO2]
+  J[56] -= dqdci; // dwdot[OH]/d[HO2]
   J[66] += dqdci; // dwdot[HO2]/d[HO2]
-  J[67] -= dqdci; // dwdot[H2O2]/d[HO2]
+  J[76] -= dqdci; // dwdot[H2O2]/d[HO2]
   // d()/d[H2O2]
   dqdci = +k_f * sc[5];
-  J[72] += dqdci; // dwdot[H2O]/d[H2O2]
-  J[75] -= dqdci; // dwdot[OH]/d[H2O2]
-  J[76] += dqdci; // dwdot[HO2]/d[H2O2]
+  J[27] += dqdci; // dwdot[H2O]/d[H2O2]
+  J[57] -= dqdci; // dwdot[OH]/d[H2O2]
+  J[67] += dqdci; // dwdot[HO2]/d[H2O2]
   J[77] -= dqdci; // dwdot[H2O2]/d[H2O2]
   // d()/dT
-  J[92] += dqdT; // dwdot[H2O]/dT
-  J[95] -= dqdT; // dwdot[OH]/dT
-  J[96] += dqdT; // dwdot[HO2]/dT
-  J[97] -= dqdT; // dwdot[H2O2]/dT
+  J[29] += dqdT; // dwdot[H2O]/dT
+  J[59] -= dqdT; // dwdot[OH]/dT
+  J[69] += dqdT; // dwdot[HO2]/dT
+  J[79] -= dqdT; // dwdot[H2O2]/dT
 
   amrex::Real c_R[9], dcRdT[9], e_RT[9];
   amrex::Real* eh_RT;
@@ -5242,7 +5242,7 @@ aJacobian(
     cmix += c_R[k] * sc[k];
     dcmixdT += dcRdT[k] * sc[k];
     ehmix += eh_RT[k] * wdot[k];
-    dehmixdT += invT * (c_R[k] - eh_RT[k]) * wdot[k] + eh_RT[k] * J[90 + k];
+    dehmixdT += invT * (c_R[k] - eh_RT[k]) * wdot[k] + eh_RT[k] * J[k * 10 + 9];
   }
 
   amrex::Real cmixinv = 1.0 / cmix;
@@ -5254,9 +5254,9 @@ aJacobian(
   for (int k = 0; k < 9; ++k) {
     dehmixdc = 0.0;
     for (int m = 0; m < 9; ++m) {
-      dehmixdc += eh_RT[m] * J[k * 10 + m];
+      dehmixdc += eh_RT[m] * J[m * 10 + k];
     }
-    J[k * 10 + 9] = tmp2 * c_R[k] - tmp3 * dehmixdc;
+    J[90 + k] = tmp2 * c_R[k] - tmp3 * dehmixdc;
   }
   // dTdot/dT
   J[99] = -tmp1 + tmp2 * dcmixdT - tmp3 * dehmixdT;
@@ -5267,7 +5267,7 @@ aJacobian(
 
 // compute the reaction Jacobian
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void
-DWDOT(
+DWDOT_ROLL(
   amrex::Real* J,
   const amrex::Real* sc,
   const amrex::Real* Tp,
@@ -5279,13 +5279,13 @@ DWDOT(
     c[k] = 1.e6 * sc[k];
   }
 
-  aJacobian(J, c, *Tp, *consP);
+  aJacobian_roll(J, c, *Tp, *consP);
 
   // dwdot[k]/dT
   // dTdot/d[X]
   for (int k = 0; k < 9; k++) {
-    J[90 + k] *= 1.e-6;
-    J[k * 10 + 9] *= 1.e6;
+    J[k * 10 + 9] *= 1.e-6;
+    J[90 + k] *= 1.e6;
   }
 }
 

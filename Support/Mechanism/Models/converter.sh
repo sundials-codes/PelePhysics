@@ -71,7 +71,7 @@ echo "Converting ${filename}"
 if command -v poetry &> /dev/null
 then
     poetry update
-    poetry run convert -f "${filename}"
+    poetry run convert -rj -f "${filename}"
 else
     echo "poetry could not be found. We recommend the use of poetry to ensure all necessary packages are available."
     echo "However, this script will proceed with the current python environment (and hope all the packages are available)."
