@@ -15,6 +15,7 @@ def ajac(
     species_info,
     reaction_info,
     jacobian=True,
+    roll_jacobian=False,
     precond=False,
     syms=None,
 ):
@@ -32,39 +33,66 @@ def ajac(
     cw.writer(fstream, "AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE")
     if n_reactions > 0:
         if precond:
-            cw.writer(
-                fstream,
-                (
-                    "void aJacobian_precond(amrex::Real *  J, const"
-                    " amrex::Real *  sc, const amrex::Real T, const int HP)"
-                ),
-            )
+            if not roll_jacobian:
+                cw.writer(
+                    fstream,
+                    "void aJacobian_precond"
+                    "(amrex::Real *  J, const amrex::Real *  sc,"
+                    " const amrex::Real T, const int HP)",
+                )
+            else:
+                cw.writer(
+                    fstream,
+                    "void aJacobian_precond_roll"
+                    "(amrex::Real *  J, const amrex::Real *  sc,"
+                    " const amrex::Real T, const int HP)",
+                )
         else:
-            cw.writer(
-                fstream,
-                (
-                    "void aJacobian(amrex::Real * J, const amrex::Real * sc,"
-                    " const amrex::Real T, const int consP)"
-                ),
-            )
+            if not roll_jacobian:
+                cw.writer(
+                    fstream,
+                    "void aJacobian"
+                    "(amrex::Real * J, const amrex::Real * sc, const amrex::Real T,"
+                    " const int consP)",
+                )
+            else:
+                cw.writer(
+                    fstream,
+                    "void aJacobian_roll"
+                    "(amrex::Real * J, const amrex::Real * sc, const amrex::Real T,"
+                    " const int consP)",
+                )
     else:
         if precond:
-            cw.writer(
-                fstream,
-                (
-                    "void aJacobian_precond(amrex::Real *  J, const"
-                    " amrex::Real *  /*sc*/, const amrex::Real /*T*/, const"
-                    " int /*HP*/)"
-                ),
-            )
+            if not roll_jacobian:
+                cw.writer(
+                    fstream,
+                    "void aJacobian_precond"
+                    "(amrex::Real *  J, const amrex::Real *  /*sc*/,"
+                    " const amrex::Real /*T*/, const int /*HP*/)",
+                )
+            else:
+                cw.writer(
+                    fstream,
+                    "void aJacobian_precond_roll"
+                    "(amrex::Real *  J, const amrex::Real *  /*sc*/,"
+                    " const amrex::Real /*T*/, const int /*HP*/)",
+                )
         else:
-            cw.writer(
-                fstream,
-                (
-                    "void aJacobian(amrex::Real * J, const amrex::Real *"
-                    " /*sc*/, const amrex::Real /*T*/, const int /*consP*/)"
-                ),
-            )
+            if not roll_jacobian:
+                cw.writer(
+                    fstream,
+                    "void aJacobian"
+                    "(amrex::Real * J, const amrex::Real * /*sc*/,"
+                    " const amrex::Real /*T*/, const int /*consP*/)",
+                )
+            else:
+                cw.writer(
+                    fstream,
+                    "void aJacobian_roll"
+                    "(amrex::Real * J, const amrex::Real * /*sc*/,"
+                    " const amrex::Real /*T*/, const int /*consP*/)",
+                )
     cw.writer(fstream, "{")
 
     cw.writer(fstream)
@@ -242,6 +270,7 @@ def ajac(
                     reaction_info,
                     reaction,
                     orig_idx,
+                    roll_jacobian=roll_jacobian,
                     precond=precond,
                     syms=syms,
                 )
@@ -287,13 +316,19 @@ def ajac(
             cw.writer(fstream, "cmix += c_R[k]*sc[k];")
             cw.writer(fstream, "dcmixdT += dcRdT[k]*sc[k];")
             cw.writer(fstream, "ehmix += eh_RT[k]*wdot[k];")
-            cw.writer(
-                fstream,
-                (
-                    "dehmixdT += invT*(c_R[k]-eh_RT[k])*wdot[k] +"
-                    f" eh_RT[k]*J[{n_species * (n_species + 1)}+k];"
-                ),
-            )
+            # Access dwdot[k]/dT
+            if not roll_jacobian:
+                cw.writer(
+                    fstream,
+                    "dehmixdT += invT*(c_R[k]-eh_RT[k])*wdot[k] + eh_RT[k]*J[%d+k];"
+                    % (n_species * (n_species + 1)),
+                )
+            else:
+                cw.writer(
+                    fstream,
+                    "dehmixdT += invT*(c_R[k]-eh_RT[k])*wdot[k] + eh_RT[k]*J[k*%d+%d];"
+                    % (n_species + 1, n_species),
+                )
             cw.writer(fstream, "}")
 
             cw.writer(fstream)
@@ -306,16 +341,32 @@ def ajac(
             cw.writer(fstream, cw.comment("dTdot/d[X]"))
             cw.writer(fstream, f"for (int k = 0; k < {n_species}; ++k) {{")
             cw.writer(fstream, "dehmixdc = 0.0;")
-            cw.writer(fstream, f"for (int m = 0; m < {n_species}; ++m) {{")
-            cw.writer(fstream, f"dehmixdc += eh_RT[m]*J[k*{n_species + 1}+m];")
+            cw.writer(fstream, "for (int m = 0; m < %d; ++m) {" % n_species)
+            # Access dwdot[m]/dx[k]
+            if not roll_jacobian:
+                cw.writer(
+                    fstream,
+                    "dehmixdc += eh_RT[m]*J[k*%s+m];" % (n_species + 1),
+                )
+            else:
+                cw.writer(
+                    fstream,
+                    "dehmixdc += eh_RT[m]*J[m*%s+k];" % (n_species + 1),
+                )
             cw.writer(fstream, "}")
-            cw.writer(
-                fstream,
-                (
-                    f"J[k*{n_species + 1}+{n_species}] = tmp2*c_R[k] -"
-                    " tmp3*dehmixdc;"
-                ),
-            )
+            # Access dTdot/dx[k]
+            if not roll_jacobian:
+                cw.writer(
+                    fstream,
+                    "J[k*%d+%d] = tmp2*c_R[k] - tmp3*dehmixdc;"
+                    % (n_species + 1, n_species),
+                )
+            else:
+                cw.writer(
+                    fstream,
+                    "J[%d+k] = tmp2*c_R[k] - tmp3*dehmixdc;"
+                    % (n_species * (n_species + 1)),
+                )
             cw.writer(fstream, "}")
 
             cw.writer(fstream, cw.comment("dTdot/dT"))
@@ -339,6 +390,7 @@ def ajac_symbolic(
     species_info,
     reaction_info,
     jacobian=True,
+    roll_jacobian=False,
     syms=None,
 ):
     """Print the Jacobian obtained from symbolic recording."""
@@ -349,14 +401,18 @@ def ajac_symbolic(
     cw.writer(fstream)
 
     # main
-    cw.writer(
-        fstream,
-        (
-            "AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void "
-            " aJacobian(amrex::Real * J, amrex::Real * sc, amrex::Real T,"
-            " const int consP)"
-        ),
-    )
+    if not roll_jacobian:
+        cw.writer(
+            fstream,
+            "AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void  aJacobian(amrex::Real"
+            " * J, amrex::Real * sc, amrex::Real T, const int consP)",
+        )
+    else:
+        cw.writer(
+            fstream,
+            "AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void  aJacobian_roll(amrex::Real"
+            " * J, amrex::Real * sc, amrex::Real T, const int consP)",
+        )
     cw.writer(fstream, "{")
 
     if not jacobian:
@@ -531,22 +587,32 @@ def ajac_symbolic(
             # Now write out the species jacobian terms
             cw.writer(fstream, cw.comment("Species terms"))
             if syms.hformat == "cpu":
-                syms.write_symjac_to_cpp_cpu(species_info, cw, fstream)
+                syms.write_symjac_to_cpp_cpu(
+                    species_info, cw, fstream, roll_jacobian=roll_jacobian
+                )
             else:
-                syms.write_symjac_to_cpp_gpu(species_info, cw, fstream)
+                syms.write_symjac_to_cpp_gpu(
+                    species_info, cw, fstream, roll_jacobian=roll_jacobian
+                )
 
             cw.writer(fstream)
 
     # dwdotdT
     cw.writer(fstream)
-    cw.writer(fstream, f"for (int k = 0; k < {n_species} ; k++) {{")
-    cw.writer(
-        fstream,
-        (
-            f"J[{n_species * (n_species + 1)} + k] = (wdot_pert1[k] -"
-            " wdot[k])/(pertT);"
-        ),
-    )
+    cw.writer(fstream, "for (int k = 0; k < %d ; k++) {" % n_species)
+    # Access dwdot[k]/dT
+    if not roll_jacobian:
+        cw.writer(
+            fstream,
+            "J[%d + k] = (wdot_pert1[k] - wdot[k])/(pertT);"
+            % (n_species * (n_species + 1),),
+        )
+    else:
+        cw.writer(
+            fstream,
+            "J[k*%d + %d] = (wdot_pert1[k] - wdot[k])/(pertT);"
+            % (n_species + 1, n_species),
+        )
     cw.writer(fstream, "}")
 
     # depends on dwdotdT and dwdotdsc
@@ -589,13 +655,19 @@ def ajac_symbolic(
     cw.writer(fstream, "cmix += c_R[k]*sc[k];")
     cw.writer(fstream, "dcmixdT += dcRdT[k]*sc[k];")
     cw.writer(fstream, "ehmix += eh_RT[k]*wdot[k];")
-    cw.writer(
-        fstream,
-        (
-            "dehmixdT += invT*(c_R[k]-eh_RT[k])*wdot[k] +"
-            f" eh_RT[k]*J[{n_species * (n_species + 1)}+k];"
-        ),
-    )
+    # Access dwdot[k]/dT
+    if not roll_jacobian:
+        cw.writer(
+            fstream,
+            "dehmixdT += invT*(c_R[k]-eh_RT[k])*wdot[k] + eh_RT[k]*J[%d+k];"
+            % (n_species * (n_species + 1)),
+        )
+    else:
+        cw.writer(
+            fstream,
+            "dehmixdT += invT*(c_R[k]-eh_RT[k])*wdot[k] + eh_RT[k]*J[%d*k+%d];"
+            % (n_species + 1, n_species),
+        )
     cw.writer(fstream, "}")
 
     cw.writer(fstream)
@@ -608,13 +680,26 @@ def ajac_symbolic(
     cw.writer(fstream, cw.comment("dTdot/d[X]"))
     cw.writer(fstream, f"for (int k = 0; k < {n_species}; ++k) {{")
     cw.writer(fstream, "dehmixdc = 0.0;")
-    cw.writer(fstream, f"for (int m = 0; m < {n_species}; ++m) {{")
-    cw.writer(fstream, f"dehmixdc += eh_RT[m]*J[k*{n_species + 1}+m];")
+    cw.writer(fstream, "for (int m = 0; m < %d; ++m) {" % n_species)
+    # Access dwdot[m]/dx[k]
+    if not roll_jacobian:
+        cw.writer(fstream, "dehmixdc += eh_RT[m]*J[k*%s+m];" % (n_species + 1))
+    else:
+        cw.writer(fstream, "dehmixdc += eh_RT[m]*J[m*%s+k];" % (n_species + 1))
     cw.writer(fstream, "}")
-    cw.writer(
-        fstream,
-        f"J[k*{n_species + 1}+{n_species}] = tmp2*c_R[k] - tmp3*dehmixdc;",
-    )
+    # Access dTdot/dx[k]
+    if not roll_jacobian:
+        cw.writer(
+            fstream,
+            "J[k*%d+%d] = tmp2*c_R[k] - tmp3*dehmixdc;"
+            % (n_species + 1, n_species),
+        )
+    else:
+        cw.writer(
+            fstream,
+            "J[%d+k] = tmp2*c_R[k] - tmp3*dehmixdc;"
+            % ((n_species + 1) * n_species),
+        )
     cw.writer(fstream, "}")
 
     cw.writer(fstream, cw.comment("dTdot/dT"))
@@ -641,6 +726,7 @@ def ajac_reaction_d(
     reaction_info,
     reaction,
     orig_idx,
+    roll_jacobian=False,
     precond=False,
     syms=None,
 ):
@@ -1329,10 +1415,17 @@ def ajac_reaction_d(
                     #
                     for m in sorted(all_dict.keys()):
                         if all_dict[m][1] != 0:
-                            s1 = (
-                                f"J[{k * (n_species + 1) + m}] +="
-                                f" {all_dict[m][1]:.15g} * dqdci;"
-                            )
+                            # Access dwdot[m]/dx[k]
+                            if not roll_jacobian:
+                                s1 = "J[%d] += %.15g * dqdci;" % (
+                                    k * (n_species + 1) + m,
+                                    all_dict[m][1],
+                                )
+                            else:
+                                s1 = "J[%d] += %.15g * dqdci;" % (
+                                    m * (n_species + 1) + k,
+                                    all_dict[m][1],
+                                )
                             s1 = s1.replace("+= 1 *", "+=").replace(
                                 "+= -1 *", "-="
                             )
@@ -1383,10 +1476,18 @@ def ajac_reaction_d(
         cw.writer(fstream, f"for (int k=0; k<{n_species}; k++) {{")
         for m in sorted(all_dict.keys()):
             if all_dict[m][1] != 0:
-                s1 = (
-                    f"J[{n_species + 1}*k+{m}] += {all_dict[m][1]:.15g} *"
-                    " dqdc[k];"
-                )
+                # Access dwdot[m]/dx[k]
+                if not roll_jacobian:
+                    s1 = "J[%d*k+%d] += %.15g * dqdc[k];" % (
+                        (n_species + 1),
+                        m,
+                        all_dict[m][1],
+                    )
+                else:
+                    s1 = "J[%d+k] += %.15g * dqdc[k];" % (
+                        (n_species + 1) * m,
+                        all_dict[m][1],
+                    )
                 s1 = s1.replace("+= 1 *", "+=").replace("+= -1 *", "-=")
                 cw.writer(fstream, s1)
         cw.writer(fstream, "}")
@@ -1396,11 +1497,17 @@ def ajac_reaction_d(
 
         for m in sorted(all_dict.keys()):
             if all_dict[m][1] != 0:
-                s1 = (
-                    f"J[{n_species * (n_species + 1) + m}] +="
-                    f" {all_dict[m][1]:.15g} * dqdT;"
-                    + cw.comment(f"dwdot[{all_dict[m][0]}]/dT")
-                )
+                # Access dwdot[m]/dT
+                if not roll_jacobian:
+                    s1 = "J[%d] += %.15g * dqdT;" % (
+                        n_species * (n_species + 1) + m,
+                        all_dict[m][1],
+                    ) + cw.comment("dwdot[%s]/dT" % (all_dict[m][0]))
+                else:
+                    s1 = "J[%d] += %.15g * dqdT;" % (
+                        m * (n_species + 1) + n_species,
+                        all_dict[m][1],
+                    ) + cw.comment("dwdot[%s]/dT" % (all_dict[m][0]))
                 s1 = s1.replace("+= 1 *", "+=").replace("+= -1 *", "-=")
                 cw.writer(fstream, s1)
 
@@ -1427,10 +1534,17 @@ def ajac_reaction_d(
                 if reaction.reversible or k in rea_dict:
                     for m in sorted(all_dict.keys()):
                         if all_dict[m][1] != 0:
-                            s1 = (
-                                f"J[{k * (n_species + 1) + m}] +="
-                                f" {all_wqss_dict[m][1]:.15g} * dqdci;"
-                            )
+                            # Access dwdot[m]/dx[k]
+                            if not roll_jacobian:
+                                s1 = "J[%d] += %.15g * dqdci;" % (
+                                    k * (n_species + 1) + m,
+                                    all_wqss_dict[m][1],
+                                )
+                            else:
+                                s1 = "J[%d] += %.15g * dqdci;" % (
+                                    m * (n_species + 1) + k,
+                                    all_wqss_dict[m][1],
+                                )
                             s1 = s1.replace("+= 1 *", "+=").replace(
                                 "+= -1 *", "-="
                             )
@@ -1441,10 +1555,17 @@ def ajac_reaction_d(
         cw.writer(fstream, cw.comment("d()/dT"))
         for m in sorted(all_dict.keys()):
             if all_dict[m][1] != 0:
-                s1 = (
-                    f"J[{n_species * (n_species + 1) + m}] +="
-                    f" {all_dict[m][1]:.15g} * dqdT;"
-                )
+                # Access dwdot[m]/dT
+                if not roll_jacobian:
+                    s1 = "J[%d] += %.15g * dqdT;" % (
+                        n_species * (n_species + 1) + m,
+                        all_dict[m][1],
+                    )
+                else:
+                    s1 = "J[%d] += %.15g * dqdT;" % (
+                        m * (n_species + 1) + n_species,
+                        all_dict[m][1],
+                    )
                 s1 = (
                     s1.replace("+= 1 *", "+=")
                     .replace("+= -1 *", "-=")
@@ -1634,7 +1755,12 @@ def dphase_space(mechanism, species_info, reagents, r, syms):
 
 
 def dproduction_rate(
-    fstream, mechanism, species_info, reaction_info, precond=False
+    fstream,
+    mechanism,
+    species_info,
+    reaction_info,
+    roll_jacobian=False,
+    precond=False,
 ):
     """Write the reaction jacobian."""
     n_species = species_info.n_species
@@ -1648,24 +1774,34 @@ def dproduction_rate(
                 " preconditioning)"
             ),
         )
-        cw.writer(
-            fstream,
-            (
+        if not roll_jacobian:
+            cw.writer(
+                fstream,
                 "AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void"
                 " DWDOT_SIMPLIFIED(amrex::Real *  J, const amrex::Real *  sc,"
-                " const amrex::Real *  Tp, const int * HP)"
-            ),
-        )
+                " const amrex::Real *  Tp, const int * HP)",
+            )
+        else:
+            cw.writer(
+                fstream,
+                "AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void"
+                " DWDOT_SIMPLIFIED_ROLL(amrex::Real *  J, const amrex::Real *  sc,"
+                " const amrex::Real *  Tp, const int * HP)",
+            )
     else:
         cw.writer(fstream, cw.comment("compute the reaction Jacobian"))
-        cw.writer(
-            fstream,
-            (
-                "AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void"
-                " DWDOT(amrex::Real *  J, const amrex::Real *  sc, const"
-                " amrex::Real *  Tp, const int * consP)"
-            ),
-        )
+        if not roll_jacobian:
+            cw.writer(
+                fstream,
+                "AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void DWDOT(amrex::Real *"
+                "  J, const amrex::Real *  sc, const amrex::Real *  Tp, const int * consP)",
+            )
+        else:
+            cw.writer(
+                fstream,
+                "AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void DWDOT_ROLL(amrex::Real *"
+                "  J, const amrex::Real *  sc, const amrex::Real *  Tp, const int * consP)",
+            )
 
     cw.writer(fstream, "{")
     cw.writer(fstream, f"amrex::Real c[{n_species}];")
@@ -1676,16 +1812,30 @@ def dproduction_rate(
 
     cw.writer(fstream)
     if precond:
-        cw.writer(fstream, "aJacobian_precond(J, c, *Tp, *HP);")
+        if not roll_jacobian:
+            cw.writer(fstream, "aJacobian_precond(J, c, *Tp, *HP);")
+        else:
+            cw.writer(fstream, "aJacobian_precond_roll(J, c, *Tp, *HP);")
     else:
-        cw.writer(fstream, "aJacobian(J, c, *Tp, *consP);")
+        if not roll_jacobian:
+            cw.writer(fstream, "aJacobian(J, c, *Tp, *consP);")
+        else:
+            cw.writer(fstream, "aJacobian_roll(J, c, *Tp, *consP);")
 
     cw.writer(fstream)
     cw.writer(fstream, cw.comment("dwdot[k]/dT"))
     cw.writer(fstream, cw.comment("dTdot/d[X]"))
-    cw.writer(fstream, f"for (int k=0; k<{n_species}; k++) {{")
-    cw.writer(fstream, f"J[{n_species * (n_species + 1)}+k] *= 1.e-6;")
-    cw.writer(fstream, f"J[k*{n_species + 1}+{n_species}] *= 1.e6;")
+    cw.writer(fstream, "for (int k=0; k<%d; k++) {" % n_species)
+    # Access dwdot[k]/dT
+    if not roll_jacobian:
+        cw.writer(fstream, "J[%d+k] *= 1.e-6;" % (n_species * (n_species + 1)))
+    else:
+        cw.writer(fstream, "J[k*%d+%d] *= 1.e-6;" % (n_species + 1, n_species))
+    # Access dTdot/dx[k]
+    if not roll_jacobian:
+        cw.writer(fstream, "J[k*%d+%d] *= 1.e6;" % (n_species + 1, n_species))
+    else:
+        cw.writer(fstream, "J[%d+k] *= 1.e6;" % (n_species * (n_species + 1)))
     cw.writer(fstream, "}")
 
     cw.writer(fstream)
