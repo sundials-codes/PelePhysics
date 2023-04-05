@@ -56,7 +56,12 @@ cJac(
       "Calling cJac with solve_type = sparse_direct only works with CUDA !");
 #endif
   } else if (solveType == magmaDirect) {
-#ifdef PELE_USE_MAGMA
+#ifdef PELE_USE_MAGMA 
+#ifdef PELE_ROLL_JAC
+    amrex::Abort(
+      "Calling cJac with solve_type = magma_direct requires PELE_ROLL_JAC = "
+      "FALSE !");
+#endif
     amrex::Real* yvec_d = N_VGetDeviceArrayPointer(y_in);
     amrex::Real* Jdata = SUNMatrix_MagmaDense_Data(J);
     const auto ec = amrex::Gpu::ExecutionConfig(ncells);
@@ -76,7 +81,7 @@ cJac(
       "Calling cJac with solve_type = magma_direct requires PELE_USE_MAGMA = "
       "TRUE !");
 #endif
-  } else if (solveType == ginkgoGMRES || solveType == ginkgoBICGSTAB) {
+  } else if (solveType == ginkgoCsrGMRES || solveType == ginkgoCsrBICGSTAB) {
 #ifdef PELE_USE_GINKGO
     auto Jgko = static_cast<sundials::ginkgo::BlockMatrix<gko::matrix::BatchCsr<amrex::Real>>*>(J->content)->GkoMtx();
 
@@ -105,39 +110,40 @@ cJac(
         }
       });
     amrex::Gpu::Device::streamSynchronize();
-
-// #ifndef PELE_ROLL_JAC
-//     amrex::Abort("ginkgo::matrix::BatchDense requires PELE_ROLL_JAC = TRUE!");
-// #endif
-//     auto Jgko = static_cast<sundials::ginkgo::BlockMatrix<gko::matrix::BatchDense<amrex::Real>>*>(J->content)->GkoMtx();
-//     amrex::Real* yvec_d  = N_VGetDeviceArrayPointer(y_in);
-//     amrex::Real* Jdata   = Jgko->get_values();
-
-//     // Sanity checks
-//     auto Jsize = Jgko->get_size();
-//     AMREX_ASSERT(
-//       Jsize->stores_equal_sizes() &&
-//       (Jsize->get_num_batch_entries()*Jsize->at(0)[0] == (NUM_SPECIES + 1) * ncells) &&
-//       (Jsize->get_num_batch_entries()*Jsize->at(0)[1] == (NUM_SPECIES + 1) * ncells));
-
-//     const auto ec = amrex::Gpu::ExecutionConfig(ncells);
-//     AMREX_ALWAYS_ASSERT(nbThreads == CVODE_NB_THREADS);
-//     amrex::launch_global<CVODE_NB_THREADS>
-//       <<<nbBlocks, CVODE_NB_THREADS, ec.sharedMem, stream>>>(
-//         [=] AMREX_GPU_DEVICE() noexcept {
-//           for (int icell = blockDim.x * blockIdx.x + threadIdx.x,
-//                 stride = blockDim.x * gridDim.x;
-//               icell < ncells; icell += stride) {
-//             fKernelDenseAJchem(icell, react_type, yvec_d, Jdata);
-//           }
-//         });
-//     amrex::Gpu::Device::streamSynchronize();
-//   }
-
 #else
     amrex::Abort(
-      "Calling cJac with solve_type = ginkgo<TYPE> requires PELE_USE_GINKGO = "
+      "Calling cJac with solve_type = ginkgoCsr* requires PELE_USE_GINKGO = "
       "TRUE !");
+#endif
+  } else if (solveType == ginkgoDenseGMRES || solveType == ginkgoDenseBICGSTAB) {
+#if defined(PELE_USE_GINKGO) && defined(PELE_ROLL_JAC)
+    auto Jgko = static_cast<sundials::ginkgo::BlockMatrix<gko::matrix::BatchDense<amrex::Real>>*>(J->content)->GkoMtx();
+    amrex::Real* yvec_d  = N_VGetDeviceArrayPointer(y_in);
+    amrex::Real* Jdata   = Jgko->get_values();
+
+    // Sanity checks
+    auto Jsize = Jgko->get_size();
+    AMREX_ASSERT(
+      Jsize->stores_equal_sizes() &&
+      (Jsize->get_num_batch_entries()*Jsize->at(0)[0] == (NUM_SPECIES + 1) * ncells) &&
+      (Jsize->get_num_batch_entries()*Jsize->at(0)[1] == (NUM_SPECIES + 1) * ncells));
+
+    const auto ec = amrex::Gpu::ExecutionConfig(ncells);
+    AMREX_ALWAYS_ASSERT(nbThreads == CVODE_NB_THREADS);
+    amrex::launch_global<CVODE_NB_THREADS>
+      <<<nbBlocks, CVODE_NB_THREADS, ec.sharedMem, stream>>>(
+        [=] AMREX_GPU_DEVICE() noexcept {
+          for (int icell = blockDim.x * blockIdx.x + threadIdx.x,
+                stride = blockDim.x * gridDim.x;
+              icell < ncells; icell += stride) {
+            fKernelDenseAJchem(icell, react_type, yvec_d, Jdata);
+          }
+        });
+    amrex::Gpu::Device::streamSynchronize();
+#else
+    amrex::Abort(
+      "Calling cJac with solve_type = ginkgoDense* requires PELE_USE_GINKGO = "
+      "TRUE and PELE_ROLL_JAC = TRUE");
 #endif
   } 
 

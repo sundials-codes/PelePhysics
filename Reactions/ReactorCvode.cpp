@@ -48,18 +48,30 @@ const std::unordered_map<std::string, SolverDescriptor> available_solver_types
        "MAGMA batched LU direct linear solver with analytical Jacobian"}},
 #endif
 #ifdef PELE_USE_GINKGO
-    {"ginkgo_GMRES",
+    {"ginkgo_csr_GMRES",
      SolverDescriptor{
-       cvode::ginkgoGMRES,
+       cvode::ginkgoCsrGMRES,
        analytical_jacobian_yes,
        {},
-       "Ginkgo batched GMRES linear solver with analytical Jacobian"}},
-    {"ginkgo_BICGSTAB",
+       "Ginkgo batched GMRES linear solver with CSR analytical Jacobian"}},
+    {"ginkgo_csr_BICGSTAB",
      SolverDescriptor{
-       cvode::ginkgoBICGSTAB,
+       cvode::ginkgoCsrBICGSTAB,
        analytical_jacobian_yes,
        {},
-       "Ginkgo batched BiCGSTAB linear solver with analytical Jacobian"}},
+       "Ginkgo batched BiCGSTAB linear solver with CSR analytical Jacobian"}},
+    {"ginkgo_dense_GMRES",
+     SolverDescriptor{
+       cvode::ginkgoDenseGMRES,
+       analytical_jacobian_yes,
+       {},
+       "Ginkgo batched GMRES linear solver with dense analytical Jacobian"}},
+    {"ginkgo_dense_BICGSTAB",
+     SolverDescriptor{
+       cvode::ginkgoDenseBICGSTAB,
+       analytical_jacobian_yes,
+       {},
+       "Ginkgo batched BiCGSTAB linear solver with dense analytical Jacobian"}},
 #endif
     {"sparse_direct",
      SolverDescriptor{
@@ -946,6 +958,9 @@ ReactorCvode::allocUserData(
 #endif
   } else if (udata->solve_type == cvode::magmaDirect) {
 #ifdef PELE_USE_MAGMA
+#ifdef PELE_ROLL_JAC
+    amrex::Abort("solve_type = magma_direct requires PELE_ROLL_JAC = FALSE !");
+#endif
     a_A = SUNMatrix_MagmaDenseBlock(
       a_ncells, (NUM_SPECIES + 1), (NUM_SPECIES + 1), SUNMEMTYPE_DEVICE,
       *amrex::sundials::The_SUNMemory_Helper(), nullptr,
@@ -954,8 +969,8 @@ ReactorCvode::allocUserData(
     amrex::Abort("Solver_type magma_direct requires PELE_USE_MAGMA = TRUE");
 #endif
   } else if (
-    udata->solve_type == cvode::ginkgoGMRES ||
-    udata->solve_type == cvode::ginkgoBICGSTAB) {
+    udata->solve_type == cvode::ginkgoCsrGMRES ||
+    udata->solve_type == cvode::ginkgoCsrBICGSTAB) {
 #ifdef PELE_USE_GINKGO
     using GkoBatchMatrixType = gko::matrix::BatchCsr<amrex::Real>;
 
@@ -988,7 +1003,28 @@ ReactorCvode::allocUserData(
     a_A = sun_batch_mat->Convert();
 #else
     amrex::Abort(
-      "Solver_type cvode::ginkgo<TYPE> requires PELE_USE_GINKGO = TRUE");
+      "Solver_type cvode::ginkgoCsr* requires PELE_USE_GINKGO = TRUE");
+#endif
+  } else if (
+    udata->solve_type == cvode::ginkgoDenseGMRES ||
+    udata->solve_type == cvode::ginkgoDenseBICGSTAB) {
+#if defined(PELE_USE_GINKGO) && defined(PELE_ROLL_JAC)
+    using GkoBatchMatrixType = gko::matrix::BatchDense<amrex::Real>;
+
+    auto batch_mat_size = gko::batch_dim<2>(
+      a_ncells, gko::dim<2>(NUM_SPECIES + 1, NUM_SPECIES + 1));
+    auto batch_mat_stride = gko::batch_stride(a_ncells, 1);
+    auto values_view = gko::Array<amrex::Real>::view(
+      gko_exec, a_ncells * udata->NNZ, udata->csr_jac_d);
+    auto gko_batch_matrix = gko::share(GkoBatchMatrixType::create(
+      gko_exec, batch_mat_size, std::move(values_view), batch_mat_stride));
+
+    auto sun_batch_mat = new sundials::ginkgo::BlockMatrix<GkoBatchMatrixType>(
+      gko_batch_matrix, *amrex::sundials::The_Sundials_Context());
+    a_A = sun_batch_mat->Convert();
+#else
+    amrex::Abort(
+      "Solver_type cvode::ginkgoDense* requires PELE_USE_GINKGO = TRUE and PELE_ROLL_JAC = TRUE");
 #endif
   }
 
@@ -1322,6 +1358,9 @@ ReactorCvode::react(
 #endif
   } else if (user_data->solve_type == cvode::magmaDirect) {
 #ifdef PELE_USE_MAGMA
+#ifdef PELE_ROLL_JAC
+    amrex::Abort("solve_type = magma_direct requires PELE_ROLL_JAC = FALSE !");
+#endif
     LS = SUNLinSol_MagmaDense(y, A, *amrex::sundials::The_Sundials_Context());
     if (utils::check_flag(static_cast<void*>(LS), "SUNLinSol_MagmaDense", 0))
       return (1);
@@ -1333,7 +1372,7 @@ ReactorCvode::react(
       "Shoudn't be there. solve_type magma_direct only available with "
       "PELE_USE_MAGMA = TRUE");
 #endif
-  } else if (user_data->solve_type == cvode::ginkgoGMRES) {
+  } else if (user_data->solve_type == cvode::ginkgoCsrGMRES) {
 #ifdef PELE_USE_GINKGO
     using GkoMatrixType = gko::matrix::Csr<amrex::Real>;
     using GkoBatchMatrixType = gko::matrix::BatchCsr<amrex::Real>;
@@ -1362,7 +1401,36 @@ ReactorCvode::react(
       "Shoudn't be there. solve_type ginkgo<TYPE> only available with "
       "PELE_USE_GINKGO = TRUE");
 #endif
-  } else if (user_data->solve_type == cvode::ginkgoBICGSTAB) {
+  } else if (user_data->solve_type == cvode::ginkgoDenseGMRES) {
+#ifdef PELE_USE_GINKGO
+    using GkoMatrixType = gko::matrix::Dense<amrex::Real>;
+    using GkoBatchMatrixType = gko::matrix::BatchDense<amrex::Real>;
+    using GkoSolverType = gko::solver::BatchGmres<amrex::Real>;
+    using SUNLinearSolverViewType =
+      sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
+
+    auto precond_factory =
+      gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build()
+                   .with_max_block_size(1u)
+                   .on(gko_exec));
+
+    auto LSview = new SUNLinearSolverViewType(
+      gko_exec, gko::stop::batch::ToleranceType::absolute, precond_factory,
+      user_data->ncells, *amrex::sundials::The_Sundials_Context());
+    LSview->setEnableScaling(linear_solver_scaling);
+    LS = LSview->Convert();
+    flag = CVodeSetLinearSolver(cvode_mem, LS, A);
+    if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
+      return (1);
+    flag = CVodeSetLSNormFactor(cvode_mem, std::sqrt(NUM_SPECIES + 1));
+    if (utils::check_flag(&flag, "CVodeSetLSNormFactor", 1))
+      return (1);
+#else
+    amrex::Abort(
+      "Shoudn't be there. solve_type ginkgoDense* only available with "
+      "PELE_USE_GINKGO = TRUE and PELE_ROLL_JAC = TRUE");
+#endif
+  } else if (user_data->solve_type == cvode::ginkgoCsrBICGSTAB) {
 #ifdef PELE_USE_GINKGO
     using GkoMatrixType = gko::matrix::Csr<amrex::Real>;
     using GkoBatchMatrixType = gko::matrix::BatchCsr<amrex::Real>;
@@ -1390,6 +1458,35 @@ ReactorCvode::react(
     amrex::Abort(
       "Shoudn't be there. solve_type ginkgo<TYPE> only available with "
       "PELE_USE_GINKGO = TRUE");
+#endif
+  } else if (user_data->solve_type == cvode::ginkgoDenseBICGSTAB) {
+#ifdef PELE_USE_GINKGO
+    using GkoMatrixType = gko::matrix::Dense<amrex::Real>;
+    using GkoBatchMatrixType = gko::matrix::BatchDense<amrex::Real>;
+    using GkoSolverType = gko::solver::BatchBicgstab<amrex::Real>;
+    using SUNLinearSolverViewType =
+      sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
+
+    auto precond_factory =
+      gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build()
+                   .with_max_block_size(1u)
+                   .on(gko_exec));
+
+    auto LSview = new SUNLinearSolverViewType(
+      gko_exec, gko::stop::batch::ToleranceType::absolute, precond_factory,
+      user_data->ncells, *amrex::sundials::The_Sundials_Context());
+    LSview->setEnableScaling(linear_solver_scaling);
+    LS = LSview->Convert();
+    flag = CVodeSetLinearSolver(cvode_mem, LS, A);
+    if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
+      return (1);
+    flag = CVodeSetLSNormFactor(cvode_mem, std::sqrt(NUM_SPECIES + 1));
+    if (utils::check_flag(&flag, "CVodeSetLSNormFactor", 1))
+      return (1);
+#else
+    amrex::Abort(
+      "Shoudn't be there. solve_type ginkgoDense* only available with "
+      "PELE_USE_GINKGO = TRUE and PELE_ROLL_JAC = TRUE");
 #endif
   } else if (user_data->solve_type == cvode::GMRES) {
     LS = SUNLinSol_SPGMR(
@@ -1723,6 +1820,9 @@ ReactorCvode::react(
 #endif
   } else if (user_data->solve_type == cvode::magmaDirect) {
 #ifdef PELE_USE_MAGMA
+#ifdef PELE_ROLL_JAC
+    amrex::Abort("solve_type = magma_direct requires PELE_ROLL_JAC = FALSE !");
+#endif
     LS = SUNLinSol_MagmaDense(y, A, *amrex::sundials::The_Sundials_Context());
     if (utils::check_flag(static_cast<void*>(LS), "SUNLinSol_MagmaDense", 0))
       return (1);
@@ -1734,17 +1834,123 @@ ReactorCvode::react(
       "Shoudn't be there. solve_type magma_direct only available with "
       "PELE_USE_MAGMA = TRUE");
 #endif
-  } else if (
-    user_data->solve_type == cvode::ginkgoGMRES ||
-    user_data->solve_type == cvode::ginkgoBICGSTAB) {
+  } else if (user_data->solve_type == cvode::ginkgoCsrGMRES) {
 #ifdef PELE_USE_GINKGO
-    /* Create linear solver */
-    amrex::Abort("Not implemented");
+    using GkoMatrixType = gko::matrix::Csr<amrex::Real>;
+    using GkoBatchMatrixType = gko::matrix::BatchCsr<amrex::Real>;
+    using GkoSolverType = gko::solver::BatchGmres<amrex::Real>;
+    using SUNLinearSolverViewType =
+      sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
+
+    auto precond_factory =
+      gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build()
+                   .with_max_block_size(1u)
+                   .on(gko_exec));
+
+    auto LSview = new SUNLinearSolverViewType(
+      gko_exec, gko::stop::batch::ToleranceType::absolute, precond_factory,
+      user_data->ncells, *amrex::sundials::The_Sundials_Context());
+    LSview->setEnableScaling(linear_solver_scaling);
+    LS = LSview->Convert();
+    flag = CVodeSetLinearSolver(cvode_mem, LS, A);
+    if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
+      return (1);
+    flag = CVodeSetLSNormFactor(cvode_mem, std::sqrt(NUM_SPECIES + 1));
+    if (utils::check_flag(&flag, "CVodeSetLSNormFactor", 1))
+      return (1);
 #else
     amrex::Abort(
       "Shoudn't be there. solve_type ginkgo<TYPE> only available with "
       "PELE_USE_GINKGO = TRUE");
 #endif
+  } else if (user_data->solve_type == cvode::ginkgoDenseGMRES) {
+#ifdef PELE_USE_GINKGO
+    using GkoMatrixType = gko::matrix::Dense<amrex::Real>;
+    using GkoBatchMatrixType = gko::matrix::BatchDense<amrex::Real>;
+    using GkoSolverType = gko::solver::BatchGmres<amrex::Real>;
+    using SUNLinearSolverViewType =
+      sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
+
+    auto precond_factory =
+      gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build()
+                   .with_max_block_size(1u)
+                   .on(gko_exec));
+
+    auto LSview = new SUNLinearSolverViewType(
+      gko_exec, gko::stop::batch::ToleranceType::absolute, precond_factory,
+      user_data->ncells, *amrex::sundials::The_Sundials_Context());
+    LSview->setEnableScaling(linear_solver_scaling);
+    LS = LSview->Convert();
+    flag = CVodeSetLinearSolver(cvode_mem, LS, A);
+    if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
+      return (1);
+    flag = CVodeSetLSNormFactor(cvode_mem, std::sqrt(NUM_SPECIES + 1));
+    if (utils::check_flag(&flag, "CVodeSetLSNormFactor", 1))
+      return (1);
+#else
+    amrex::Abort(
+      "Shoudn't be there. solve_type ginkgo<TYPE> only available with "
+      "PELE_USE_GINKGO = TRUE");
+#endif
+  } else if (user_data->solve_type == cvode::ginkgoCsrBICGSTAB) {
+#ifdef PELE_USE_GINKGO
+    using GkoMatrixType = gko::matrix::Csr<amrex::Real>;
+    using GkoBatchMatrixType = gko::matrix::BatchCsr<amrex::Real>;
+    using GkoSolverType = gko::solver::BatchBicgstab<amrex::Real>;
+    using SUNLinearSolverViewType =
+      sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
+
+    auto precond_factory =
+      gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build()
+                   .with_max_block_size(1u)
+                   .on(gko_exec));
+
+    auto LSview = new SUNLinearSolverViewType(
+      gko_exec, gko::stop::batch::ToleranceType::absolute, precond_factory,
+      user_data->ncells, *amrex::sundials::The_Sundials_Context());
+    LSview->setEnableScaling(linear_solver_scaling);
+    LS = LSview->Convert();
+    flag = CVodeSetLinearSolver(cvode_mem, LS, A);
+    if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
+      return (1);
+    flag = CVodeSetLSNormFactor(cvode_mem, std::sqrt(NUM_SPECIES + 1));
+    if (utils::check_flag(&flag, "CVodeSetLSNormFactor", 1))
+      return (1);
+#else
+    amrex::Abort(
+      "Shoudn't be there. solve_type ginkgo<TYPE> only available with "
+      "PELE_USE_GINKGO = TRUE");
+#endif
+  } else if (user_data->solve_type == cvode::ginkgoDenseBICGSTAB) {
+#ifdef PELE_USE_GINKGO
+    using GkoMatrixType = gko::matrix::Dense<amrex::Real>;
+    using GkoBatchMatrixType = gko::matrix::BatchDense<amrex::Real>;
+    using GkoSolverType = gko::solver::BatchBicgstab<amrex::Real>;
+    using SUNLinearSolverViewType =
+      sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
+
+    auto precond_factory =
+      gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build()
+                   .with_max_block_size(1u)
+                   .on(gko_exec));
+
+    auto LSview = new SUNLinearSolverViewType(
+      gko_exec, gko::stop::batch::ToleranceType::absolute, precond_factory,
+      user_data->ncells, *amrex::sundials::The_Sundials_Context());
+    LSview->setEnableScaling(linear_solver_scaling);
+    LS = LSview->Convert();
+    flag = CVodeSetLinearSolver(cvode_mem, LS, A);
+    if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
+      return (1);
+    flag = CVodeSetLSNormFactor(cvode_mem, std::sqrt(NUM_SPECIES + 1));
+    if (utils::check_flag(&flag, "CVodeSetLSNormFactor", 1))
+      return (1);
+#else
+    amrex::Abort(
+      "Shoudn't be there. solve_type ginkgoDense* only available with "
+      "PELE_USE_GINKGO = TRUE and PELE_ROLL_JAC = TRUE");
+#endif
+
   } else if (user_data->solve_type == cvode::GMRES) {
     LS = SUNLinSol_SPGMR(
       y, SUN_PREC_NONE, 0, *amrex::sundials::The_Sundials_Context());

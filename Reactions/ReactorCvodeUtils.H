@@ -109,8 +109,10 @@ enum linSolveType {
   GMRES,
   BCGS,
   precGMRES,
-  ginkgoGMRES,
-  ginkgoBICGSTAB
+  ginkgoDenseGMRES,
+  ginkgoDenseBICGSTAB,
+  ginkgoCsrGMRES,
+  ginkgoCsrBICGSTAB
 };
 enum precondType { sparseSimpleAJac };
 #else
