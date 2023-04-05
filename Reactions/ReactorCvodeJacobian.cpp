@@ -195,7 +195,24 @@ cJac(
       static_cast<int>(reactor_type == ReactorTypes::h_reactor_type);
     auto eos = pele::physics::PhysicsType::eos();
     eos.RTY2JAC(rho, temp, massfrac, Jmat_tmp, consP);
-
+#ifdef PELE_ROLL_JAC
+    // fill the sunMat and scale
+    for (int i = 0; i < NUM_SPECIES; i++) {
+      // cppcheck-suppress cstyleCast
+      amrex::Real* J_col = SM_COLUMN_D(J, offset + i);
+      for (int k = 0; k < NUM_SPECIES; k++) {
+        J_col[offset + k] = Jmat_tmp[k * (NUM_SPECIES + 1) + i] * mw[k] / mw[i];
+      }
+      J_col[offset + NUM_SPECIES] =
+        Jmat_tmp[NUM_SPECIES * (NUM_SPECIES + 1) + i] / mw[i];
+    }
+    // cppcheck-suppress cstyleCast
+    amrex::Real* J_col = SM_COLUMN_D(J, offset + NUM_SPECIES);
+    for (int i = 0; i < NUM_SPECIES; i++) {
+      J_col[offset + i] = Jmat_tmp[i * (NUM_SPECIES + 1) + NUM_SPECIES] * mw[i];
+    }
+    // J_col = SM_COLUMN_D(J, offset); // Never read
+#else
     // fill the sunMat and scale
     for (int i = 0; i < NUM_SPECIES; i++) {
       // cppcheck-suppress cstyleCast
@@ -212,6 +229,7 @@ cJac(
       J_col[offset + i] = Jmat_tmp[NUM_SPECIES * (NUM_SPECIES + 1) + i] * mw[i];
     }
     // J_col = SM_COLUMN_D(J, offset); // Never read
+#endif
   }
 
   return (0);
@@ -285,6 +303,19 @@ cJac_sps(
         static_cast<int>(reactor_type == ReactorTypes::h_reactor_type);
       auto eos = pele::physics::PhysicsType::eos();
       eos.RTY2JAC(rho, temp, massfrac, Jmat_tmp, consP);
+#ifdef PELE_ROLL_JAC
+      temp_save_lcl = temp;
+      // rescale
+      for (int i = 0; i < NUM_SPECIES; i++) {
+        for (int k = 0; k < NUM_SPECIES; k++) {
+          Jmat_tmp[i * (NUM_SPECIES + k) + i] *= mw[i] / mw[k];
+        }
+        Jmat_tmp[NUM_SPECIES * (NUM_SPECIES + 1) + i] /= mw[i];
+      }
+      for (int i = 0; i < NUM_SPECIES; i++) {
+        Jmat_tmp[i * (NUM_SPECIES + 1) + NUM_SPECIES] *= mw[i];
+      }
+#else
       temp_save_lcl = temp;
       // rescale
       for (int i = 0; i < NUM_SPECIES; i++) {
@@ -296,6 +327,7 @@ cJac_sps(
       for (int i = 0; i < NUM_SPECIES; i++) {
         Jmat_tmp[NUM_SPECIES * (NUM_SPECIES + 1) + i] *= mw[i];
       }
+#endif
     }
     // Go from Dense to Sparse
     for (int i = 1; i < NUM_SPECIES + 2; i++) {
@@ -378,6 +410,19 @@ cJac_KLU(
       const int consP = reactor_type == ReactorTypes::h_reactor_type;
       auto eos = pele::physics::PhysicsType::eos();
       eos.RTY2JAC(rho, temp, massfrac, Jmat_tmp, consP);
+#ifdef PELE_ROLL_JAC
+      temp_save_lcl = temp;
+      // rescale
+      for (int i = 0; i < NUM_SPECIES; i++) {
+        for (int k = 0; k < NUM_SPECIES; k++) {
+          Jmat_tmp[i * (NUM_SPECIES + 1) + k] *= mw[i] / mw[k];
+        }
+        Jmat_tmp[NUM_SPECIES * (NUM_SPECIES + 1) + i] /= mw[i];
+      }
+      for (int i = 0; i < NUM_SPECIES; i++) {
+        Jmat_tmp[i * (NUM_SPECIES + 1) + NUM_SPECIES] *= mw[i];
+      }
+#else
       temp_save_lcl = temp;
       // rescale
       for (int i = 0; i < NUM_SPECIES; i++) {
@@ -389,6 +434,7 @@ cJac_KLU(
       for (int i = 0; i < NUM_SPECIES; i++) {
         Jmat_tmp[NUM_SPECIES * (NUM_SPECIES + 1) + i] *= mw[i];
       }
+#endif
     }
     // Go from Dense to Sparse
     BL_PROFILE_VAR("DensetoSps", DtoS);

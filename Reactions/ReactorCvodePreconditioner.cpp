@@ -213,8 +213,25 @@ Precond(
     eos.RTY2C(rho, temp, massfrac, activity);
     int consP = static_cast<int>(reactor_type == ReactorTypes::h_reactor_type);
     amrex::Real Jmat[(NUM_SPECIES + 1) * (NUM_SPECIES + 1)] = {0.0};
+#ifdef PELE_ROLL_JAC
+    DWDOT_SIMPLIFIED_ROLL(Jmat, activity, &temp, &consP);
+    // Scale Jacobian.  Load into P.
+    SUNDlsMat_denseScale(0.0, Jbd[0][0], NUM_SPECIES + 1, NUM_SPECIES + 1);
+    for (int i = 0; i < NUM_SPECIES; i++) {
+      for (int k = 0; k < NUM_SPECIES; k++) {
+        (Jbd[0][0])[k][i] = Jmat[i * (NUM_SPECIES + 1) + k] * mw[i] / mw[k];
+      }
+      (Jbd[0][0])[i][NUM_SPECIES] =
+        Jmat[NUM_SPECIES * (NUM_SPECIES + 1) + i] / mw[i];
+    }
+    for (int i = 0; i < NUM_SPECIES; i++) {
+      (Jbd[0][0])[NUM_SPECIES][i] =
+        Jmat[i * (NUM_SPECIES + 1) + NUM_SPECIES] * mw[i];
+    }
+    (Jbd[0][0])[NUM_SPECIES][NUM_SPECIES] =
+      Jmat[(NUM_SPECIES + 1) * (NUM_SPECIES + 1) - 1];
+#else
     DWDOT_SIMPLIFIED(Jmat, activity, &temp, &consP);
-
     // Scale Jacobian.  Load into P.
     SUNDlsMat_denseScale(0.0, Jbd[0][0], NUM_SPECIES + 1, NUM_SPECIES + 1);
     for (int i = 0; i < NUM_SPECIES; i++) {
@@ -230,6 +247,7 @@ Precond(
     }
     (Jbd[0][0])[NUM_SPECIES][NUM_SPECIES] =
       Jmat[(NUM_SPECIES + 1) * (NUM_SPECIES + 1) - 1];
+#endif
 
     SUNDlsMat_denseCopy(Jbd[0][0], P[0][0], NUM_SPECIES + 1, NUM_SPECIES + 1);
 
@@ -343,12 +361,37 @@ Precond_sparse(
       auto eos = pele::physics::PhysicsType::eos();
       eos.RTY2C(rho, temp, massfrac, activity);
 
+#ifdef PELE_ROLL_JAC
+      // Do we recompute Jac ?
+      if (fabs(temp - temp_save_lcl) > 1.0) {
+        // Formalism
+        int consP = reactor_type == ReactorTypes::h_reactor_type;
+        DWDOT_SIMPLIFIED_ROLL(JSPSmat[tid], activity, &temp, &consP);
+        for (int i = 0; i < NUM_SPECIES; i++) {
+          for (int k = 0; k < NUM_SPECIES; k++) {
+            (JSPSmat[tid])[i * (NUM_SPECIES + 1) + k] *= mw[i] / mw[k];
+          }
+          (JSPSmat[tid])[NUM_SPECIES * (NUM_SPECIES + 1) + i] /= mw[i];
+        }
+        for (int i = 0; i < NUM_SPECIES; i++) {
+          (JSPSmat[tid])[i * (NUM_SPECIES + 1) + NUM_SPECIES] *= mw[i];
+        }
+        temp_save_lcl = temp;
+      } else {
+        // if not: copy the one from prev cell
+        for (int i = 0; i < NUM_SPECIES + 1; i++) {
+          for (int k = 0; k < NUM_SPECIES + 1; k++) {
+            (JSPSmat[tid])[i * (NUM_SPECIES + 1) + k] =
+              (JSPSmat[tid - 1])[i * (NUM_SPECIES + 1) + k];
+          }
+        }
+      }
+#else
       // Do we recompute Jac ?
       if (fabs(temp - temp_save_lcl) > 1.0) {
         // Formalism
         int consP = reactor_type == ReactorTypes::h_reactor_type;
         DWDOT_SIMPLIFIED(JSPSmat[tid], activity, &temp, &consP);
-
         for (int i = 0; i < NUM_SPECIES; i++) {
           for (int k = 0; k < NUM_SPECIES; k++) {
             (JSPSmat[tid])[k * (NUM_SPECIES + 1) + i] *= mw[i] / mw[k];
@@ -368,6 +411,7 @@ Precond_sparse(
           }
         }
       }
+#endif
     }
 
     *jcurPtr = SUNTRUE;
@@ -513,13 +557,39 @@ Precond_custom(
       auto eos = pele::physics::PhysicsType::eos();
       eos.RTY2C(rho, temp, massfrac, activity);
 
+#ifdef PELE_ROLL_JAC
+      // Do we recompute Jac ?
+      if (fabs(temp - temp_save_lcl) > 1.0) {
+        // Formalism
+        int consP =
+          static_cast<int>(reactor_type == ReactorTypes::h_reactor_type);
+        DWDOT_SIMPLIFIED_ROLL(JSPSmat[tid], activity, &temp, &consP);
+        for (int i = 0; i < NUM_SPECIES; i++) {
+          for (int k = 0; k < NUM_SPECIES; k++) {
+            (JSPSmat[tid])[i * (NUM_SPECIES + 1) + k] *= mw[i] / mw[k];
+          }
+          (JSPSmat[tid])[NUM_SPECIES * (NUM_SPECIES + 1) + i] /= mw[i];
+        }
+        for (int i = 0; i < NUM_SPECIES; i++) {
+          (JSPSmat[tid])[i * (NUM_SPECIES + 1) + NUM_SPECIES] *= mw[i];
+        }
+        temp_save_lcl = temp;
+      } else {
+        // if not: copy the one from prev cell
+        for (int i = 0; i < NUM_SPECIES + 1; i++) {
+          for (int k = 0; k < NUM_SPECIES + 1; k++) {
+            (JSPSmat[tid])[i * (NUM_SPECIES + 1) + k] =
+              (JSPSmat[tid - 1])[i * (NUM_SPECIES + 1) + k];
+          }
+        }
+      }
+#else
       // Do we recompute Jac ?
       if (fabs(temp - temp_save_lcl) > 1.0) {
         // Formalism
         int consP =
           static_cast<int>(reactor_type == ReactorTypes::h_reactor_type);
         DWDOT_SIMPLIFIED(JSPSmat[tid], activity, &temp, &consP);
-
         for (int i = 0; i < NUM_SPECIES; i++) {
           for (int k = 0; k < NUM_SPECIES; k++) {
             (JSPSmat[tid])[k * (NUM_SPECIES + 1) + i] *= mw[i] / mw[k];
@@ -539,6 +609,7 @@ Precond_custom(
           }
         }
       }
+#endif
     }
     *jcurPtr = SUNTRUE;
   }
