@@ -1011,11 +1011,14 @@ ReactorCvode::allocUserData(
 #if defined(PELE_USE_GINKGO) && defined(PELE_ROLL_JAC)
     using GkoBatchMatrixType = gko::matrix::BatchDense<amrex::Real>;
 
+    udata->dense_jac_d = static_cast<amrex::Real*>(
+      amrex::The_Arena()->alloc((NUM_SPECIES + 1) * (NUM_SPECIES + 1) * a_ncells * sizeof(amrex::Real)));
+
     auto batch_mat_size = gko::batch_dim<2>(
       a_ncells, gko::dim<2>(NUM_SPECIES + 1, NUM_SPECIES + 1));
-    auto batch_mat_stride = gko::batch_stride(a_ncells, 1);
+    auto batch_mat_stride = gko::batch_stride(a_ncells, (NUM_SPECIES + 1));
     auto values_view = gko::Array<amrex::Real>::view(
-      gko_exec, a_ncells * udata->NNZ, udata->csr_jac_d);
+      gko_exec, (NUM_SPECIES + 1) * (NUM_SPECIES + 1) * a_ncells, udata->dense_jac_d);
     auto gko_batch_matrix = gko::share(GkoBatchMatrixType::create(
       gko_exec, batch_mat_size, std::move(values_view), batch_mat_stride));
 

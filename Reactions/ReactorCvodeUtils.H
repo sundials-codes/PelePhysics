@@ -59,6 +59,7 @@ struct CVODEUserData
   int* csr_col_index_d;   // Device CSR sparse mat
   amrex::Real* csr_val_d; // Syst. Jac. CSR sparse mat values
   amrex::Real* csr_jac_d; // Chem. Jac. CSR sparse mat values
+  amrex::Real* dense_jac_d; // Dense Jacobian data
 
 #ifdef AMREX_USE_CUDA
   // Batched QR preconditioner data
