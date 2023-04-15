@@ -184,7 +184,7 @@ private:
   int max_err_test_fails{100};
   int max_num_steps{100000};
   bool sunprofiler_print_every_step{false};
-  bool linear_solver_scaling{true}; // TODO(CJB): temporary, remove after debugging
+  int linear_solver_scaling{2}; // TODO(CJB): temporary, remove after debugging
 
   // This block of CVODE parameters are initialized to the CVODE default values.
   // WARNING: it is unwise to change these without a really good reason. The
