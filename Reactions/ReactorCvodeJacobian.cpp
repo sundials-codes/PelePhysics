@@ -76,12 +76,18 @@ cJac(
       "Calling cJac with solve_type = magma_direct requires PELE_USE_MAGMA = "
       "TRUE !");
 #endif
-  } else if (solveType == ginkgoGMRES || solveType == ginkgoBICGSTAB) {
+  } else if (
+    solveType == ginkgoGMRES || solveType == ginkgoBICGSTAB ||
+    solverType == ginkgoRICHARDSON) {
 #ifdef PELE_USE_GINKGO
-    auto Jgko = static_cast<sundials::ginkgo::BlockMatrix<gko::matrix::BatchCsr<amrex::Real>>*>(J->content)->GkoMtx();
+    auto Jgko =
+      static_cast<
+        sundials::ginkgo::BlockMatrix<gko::matrix::BatchCsr<amrex::Real>>*>(
+        J->content)
+        ->GkoMtx();
 
-    amrex::Real* yvec_d  = N_VGetDeviceArrayPointer(y_in);
-    amrex::Real* Jdata   = Jgko->get_values();
+    amrex::Real* yvec_d = N_VGetDeviceArrayPointer(y_in);
+    amrex::Real* Jdata = Jgko->get_values();
     int* csr_row_count_d = Jgko->get_row_ptrs();
     int* csr_col_index_d = Jgko->get_col_idxs();
 

@@ -60,6 +60,12 @@ const std::unordered_map<std::string, SolverDescriptor> available_solver_types
        analytical_jacobian_yes,
        {},
        "Ginkgo batched BiCGSTAB linear solver with analytical Jacobian"}},
+    {"ginkgo_RICHARDSON",
+     SolverDescriptor{
+       cvode::ginkgoRICHARDSON,
+       analytical_jacobian_yes,
+       {},
+       "Ginkgo batched Richardson linear solver with analytical Jacobian"}},
 #endif
     {"sparse_direct",
      SolverDescriptor{
@@ -1367,6 +1373,34 @@ ReactorCvode::react(
     using GkoMatrixType = gko::matrix::Csr<amrex::Real>;
     using GkoBatchMatrixType = gko::matrix::BatchCsr<amrex::Real>;
     using GkoSolverType = gko::solver::BatchBicgstab<amrex::Real>;
+    using SUNLinearSolverViewType =
+      sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
+
+    auto precond_factory =
+      gko::share(gko::preconditioner::BatchJacobi<amrex::Real>::build()
+                   .with_max_block_size(1u)
+                   .on(gko_exec));
+
+    auto LSview = new SUNLinearSolverViewType(
+      gko_exec, gko::stop::batch::ToleranceType::absolute, precond_factory,
+      user_data->ncells, *amrex::sundials::The_Sundials_Context());
+    LSview->setEnableScaling(linear_solver_scaling);
+    LS = LSview->Convert();
+    flag = CVodeSetLinearSolver(cvode_mem, LS, A);
+    if (utils::check_flag(&flag, "CVodeSetLinearSolver", 1))
+      return (1);
+    flag = CVodeSetLSNormFactor(cvode_mem, std::sqrt(NUM_SPECIES + 1));
+    if (utils::check_flag(&flag, "CVodeSetLSNormFactor", 1))
+      return (1);
+#else
+    amrex::Abort(
+      "Shoudn't be there. solve_type ginkgo<TYPE> only available with "
+      "PELE_USE_GINKGO = TRUE");
+  } else if (user_data->solve_type == cvode::ginkgoRICHARDSON) {
+#ifdef PELE_USE_GINKGO
+    using GkoMatrixType = gko::matrix::Csr<amrex::Real>;
+    using GkoBatchMatrixType = gko::matrix::BatchCsr<amrex::Real>;
+    using GkoSolverType = gko::solver::BatchRichardson<amrex::Real>;
     using SUNLinearSolverViewType =
       sundials::ginkgo::BlockLinearSolver<GkoSolverType, GkoBatchMatrixType>;
 
