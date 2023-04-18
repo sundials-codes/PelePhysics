@@ -1396,6 +1396,7 @@ ReactorCvode::react(
     amrex::Abort(
       "Shoudn't be there. solve_type ginkgo<TYPE> only available with "
       "PELE_USE_GINKGO = TRUE");
+#endif
   } else if (user_data->solve_type == cvode::ginkgoRICHARDSON) {
 #ifdef PELE_USE_GINKGO
     using GkoMatrixType = gko::matrix::Csr<amrex::Real>;

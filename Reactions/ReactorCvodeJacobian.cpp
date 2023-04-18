@@ -78,7 +78,7 @@ cJac(
 #endif
   } else if (
     solveType == ginkgoGMRES || solveType == ginkgoBICGSTAB ||
-    solverType == ginkgoRICHARDSON) {
+    solveType == ginkgoRICHARDSON) {
 #ifdef PELE_USE_GINKGO
     auto Jgko =
       static_cast<
